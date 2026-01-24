@@ -5,39 +5,53 @@ import React, { useEffect, useRef, useState } from "react";
 const STEPS = [
     {
         id: 1,
-        title: "Asset Encryption",
-        description: "The seller defines auction parameters. A symmetric key is generated locally. The asset metadata is encrypted client-side before ever touching the network.",
+        title: "Lock NFT",
+        description: "The seller defines auction parameters and locks the NFT into escrow. The asset is cryptographically secured before bidding begins.",
         diagram: (
-            <svg width="100%" height="100" viewBox="0 0 400 100" className="opacity-60">
-                <rect x="50" y="30" width="40" height="40" fill="none" stroke="currentColor" />
-                <path d="M100 50 L300 50" stroke="currentColor" strokeDasharray="4 4" />
-                <circle cx="350" cy="50" r="20" fill="none" stroke="currentColor" />
+            <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
+                <rect x="50" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M120 60 L280 60" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4" />
+                <rect x="280" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
             </svg>
         )
     },
     {
         id: 2,
-        title: "Blind Bidding",
-        description: "Bidders place value into the contract. The bid amount is hidden using a commit-reveal scheme. Proof of funds is verified without revealing the specific amount to other observers.",
+        title: "Submit Encrypted Bids",
+        description: "Bidders place encrypted bids into the contract. The bid amount is hidden using a commit-reveal scheme. No information is leaked during the bidding period.",
         diagram: (
-            <svg width="100%" height="100" viewBox="0 0 400 100" className="opacity-60">
-                <circle cx="50" cy="20" r="5" fill="currentColor" />
-                <circle cx="50" cy="50" r="5" fill="currentColor" />
-                <circle cx="50" cy="80" r="5" fill="currentColor" />
-                <path d="M80 50 L320 50" stroke="currentColor" />
-                <rect x="340" y="30" width="40" height="40" fill="none" stroke="currentColor" />
+            <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
+                <circle cx="50" cy="30" r="4" fill="currentColor" />
+                <circle cx="50" cy="60" r="4" fill="currentColor" />
+                <circle cx="50" cy="90" r="4" fill="currentColor" />
+                <path d="M70 60 L320 60" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="320" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
             </svg>
         )
     },
     {
         id: 3,
-        title: "Settlement",
-        description: "Once the auction expires, the contract decrypts the highest bid. Funds are transferred, the asset is released, and losing bids are unsealed for withdrawal.",
+        title: "Reveal Winner",
+        description: "Once the auction expires, all bids are revealed. The contract identifies the highest bidder and prepares for settlement.",
         diagram: (
-            <svg width="100%" height="100" viewBox="0 0 400 100" className="opacity-60">
-                <rect x="180" y="10" width="40" height="80" fill="none" stroke="currentColor" />
-                <path d="M180 50 L50 50" stroke="currentColor" strokeDasharray="4 4" />
-                <path d="M220 50 L350 50" stroke="currentColor" />
+            <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
+                <rect x="160" y="20" width="60" height="80" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M160 60 L50 60" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4" />
+                <path d="M220 60 L350 60" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+        )
+    },
+    {
+        id: 4,
+        title: "Automatic Settlement",
+        description: "Funds are transferred to the seller, the NFT is released to the winner, and losing bids are automatically refunded. The process is trustless and irreversible.",
+        diagram: (
+            <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
+                <rect x="50" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M120 60 L180 60" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="180" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M240 60 L290 60" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="290" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
             </svg>
         )
     },
@@ -57,7 +71,7 @@ export default function HowItWorksPage() {
                     }
                 });
             },
-            { rootMargin: "-20% 0px -50% 0px", threshold: 0.5 }
+            { rootMargin: "-30% 0px -30% 0px", threshold: 0.6 }
         );
 
         stepRefs.current.forEach((ref) => {
@@ -70,32 +84,38 @@ export default function HowItWorksPage() {
     return (
         <main className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto pt-24">
             <header className="mb-24 opacity-0 animate-fade-in">
-                <h1 className="font-display text-5xl mb-6">Protocol Flow</h1>
+                <h1 className="font-display text-5xl mb-6">How It Works</h1>
                 <p className="font-sans text-foreground/60 max-w-xl text-lg leading-relaxed">
                     The Sealed Bid protocol ensures market integrity by removing information asymmetry.
-                    Here is how the trustless mechanism operates.
+                    Explain without flexing.
                 </p>
             </header>
 
-            <div className="relative border-l border-foreground/10 ml-4 md:ml-0 pl-12 md:pl-24 space-y-32 pb-32">
+            <div className="relative border-l border-foreground/10 ml-4 md:ml-0 pl-12 md:pl-24 space-y-40 pb-40">
                 {STEPS.map((step, i) => (
                     <div
                         key={step.id}
                         ref={(el) => { stepRefs.current[i] = el; }}
                         data-index={step.id}
-                        className={`transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${activeStep === step.id ? "opacity-100 blur-0 translate-x-0" : "opacity-20 blur-[1px] translate-x-4"
-                            }`}
+                        className={`transition-all duration-400 ease-in-out ${
+                            activeStep === step.id 
+                                ? "opacity-100 translate-y-0" 
+                                : activeStep > step.id
+                                ? "opacity-30 translate-y-0"
+                                : "opacity-20 translate-y-4 pointer-events-none"
+                        }`}
                     >
-                        <div className="absolute -left-[5px] w-[9px] h-[9px] rounded-full bg-foreground mt-2"
-                            style={{ opacity: activeStep === step.id ? 1 : 0.1 }}
+                        <div 
+                            className="absolute -left-[5px] w-[9px] h-[9px] rounded-full bg-foreground mt-2 transition-opacity duration-400"
+                            style={{ opacity: activeStep === step.id ? 1 : activeStep > step.id ? 0.3 : 0.1 }}
                         />
 
-                        <h3 className="font-display text-3xl mb-4">{step.title}</h3>
-                        <p className="font-sans text-foreground/80 mb-8 max-w-md leading-relaxed text-lg">
+                        <h3 className="font-display text-3xl mb-6">{step.title}</h3>
+                        <p className="font-sans text-foreground/70 mb-10 max-w-lg leading-relaxed text-base">
                             {step.description}
                         </p>
 
-                        <div className="max-w-md border-t border-b border-foreground/10 py-8">
+                        <div className="max-w-lg border-t border-b border-foreground/10 py-10">
                             {step.diagram}
                         </div>
                     </div>

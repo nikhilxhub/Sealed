@@ -1,56 +1,62 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/Badge";
 
-const ACTIVITY_DATA = [
-    { id: "1", action: "Bid Placed", asset: "Meridian Bond 004", details: "Encrypted (Poly-G2)", time: "10 mins ago", status: "Confirming" },
-    { id: "2", action: "Listing Created", asset: "Obsidian Shard", details: "Reserve: 155 ETH", time: "2 days ago", status: "Active" },
-    { id: "3", action: "Bid Revealed", asset: "Archive Key #882", details: "Did not win", time: "5 days ago", status: "Closed" },
-];
+// Mock Data (Empty for First Visit Experience)
+// const ACTIVITY_DATA = [ ... ];
+const ACTIVITY_DATA: Array<{ id: string, type: string, asset: string, status: string, time: string }> = [];
 
 export default function ActivityPage() {
     return (
-        <main className="min-h-screen p-6 md:p-12 max-w-5xl mx-auto pt-24">
-            <div className="mb-12">
-                <h1 className="font-display text-4xl mb-2">Ledger Activity</h1>
-                <p className="font-sans text-foreground/40 text-sm">
-                    Immutable record of your interactions.
+        <main className="min-h-screen p-6 md:p-12 max-w-[1200px] mx-auto pt-24 animate-fade-in">
+            <div className="mb-16">
+                <h1 className="font-display text-4xl text-white mb-3">My Activity</h1>
+                <p className="font-sans text-[#B5B8C1] text-sm">
+                    Observational record of your auction interactions.
                 </p>
             </div>
 
-            <div className="w-full text-sm font-sans">
+            <div className="w-full font-sans">
                 {/* Header */}
-                <div className="grid grid-cols-12 gap-4 pb-4 border-b border-foreground/10 text-foreground/40 font-mono text-xs uppercase tracking-widest px-4">
+                <div className="grid grid-cols-12 gap-4 pb-4 border-b border-[#24262D] text-[#B5B8C1] font-mono text-xs uppercase tracking-widest opacity-60">
                     <div className="col-span-2">Type</div>
-                    <div className="col-span-4">Asset Reference</div>
-                    <div className="col-span-3">Payload</div>
-                    <div className="col-span-2 text-right">Timestamp</div>
-                    <div className="col-span-1 text-right">Status</div>
+                    <div className="col-span-5">Asset</div>
+                    <div className="col-span-4">Status</div>
+                    <div className="col-span-1 text-right">Time</div>
                 </div>
 
-                {/* Rows */}
-                <div className="opacity-0 animate-fade-in">
-                    {ACTIVITY_DATA.map((item) => (
-                        <div key={item.id} className="grid grid-cols-12 gap-4 py-6 border-b border-foreground/5 items-center hover:bg-foreground/[0.01] transition-colors px-4">
-                            <div className="col-span-2 text-foreground/80">{item.action}</div>
-                            <div className="col-span-4 font-mono text-foreground/60">{item.asset}</div>
-                            <div className="col-span-3 text-foreground/40 italic">{item.details}</div>
-                            <div className="col-span-2 text-right text-foreground/40 font-mono">{item.time}</div>
-                            <div className="col-span-1 text-right">
-                                <span className={`inline-block px-2 py-1 text-[10px] uppercase tracking-wider border ${item.status === "Active" ? "border-green-500/20 text-green-500/80" :
-                                        item.status === "Closed" ? "border-foreground/20 text-foreground/40" :
-                                            "border-yellow-500/20 text-yellow-500/80"
-                                    }`}>
-                                    {item.status}
-                                </span>
+                {/* Content */}
+                {ACTIVITY_DATA.length > 0 ? (
+                    <div className="opacity-0 animate-fade-in-delayed delay-150">
+                        {ACTIVITY_DATA.map((item, index) => (
+                            <div
+                                key={item.id}
+                                className="grid grid-cols-12 gap-4 py-6 border-b border-[#24262D] items-center hover:bg-[#1A1C22] transition-colors duration-240"
+                                style={{ animationDelay: `${index * 40}ms` }}
+                            >
+                                <div className="col-span-2 text-[#B5B8C1] text-sm">{item.type}</div>
+                                <div className="col-span-5 font-display text-lg text-white">{item.asset}</div>
+                                <div className="col-span-4 text-[#B5B8C1] text-sm font-sans">{item.status}</div>
+                                <div className="col-span-1 text-right text-[#B5B8C1] font-mono text-xs">{item.time}</div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Empty State / Footer */}
-                {ACTIVITY_DATA.length === 0 && (
-                    <div className="py-24 text-center text-foreground/30 font-mono text-xs">No recorded activity on this chain.</div>
+                        ))}
+                    </div>
+                ) : (
+                    /* Initial Onboarding / Empty State */
+                    <div className="py-24 text-center animate-fade-in-slow">
+                        <h3 className="font-display text-xl text-white mb-2">No activity yet</h3>
+                        <p className="font-sans text-[#B5B8C1] mb-8">
+                            Place your first bid or create an auction to begin.
+                        </p>
+                        <Link
+                            href="/explore"
+                            className="text-[#EDEDED] hover:text-white hover:underline decoration-1 underline-offset-4 font-medium transition-colors"
+                        >
+                            Explore auctions &rarr;
+                        </Link>
+                    </div>
                 )}
             </div>
         </main>
