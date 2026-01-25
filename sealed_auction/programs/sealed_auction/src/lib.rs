@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
+use anchor_lang::system_program;
 
 mod state;
 mod errors;
@@ -27,6 +28,7 @@ pub mod sealed_auction {
         let now = Clock::get()?.unix_timestamp;
 
         require!(end_time > now, AuctionError::InvalidEndTime);
+        require!(min_price > 0, AuctionError::InvalidMinPrice);
 
         auction.seller = ctx.accounts.seller.key();
         auction.nft_mint = ctx.accounts.nft_mint.key();
@@ -47,6 +49,7 @@ pub mod sealed_auction {
     pub fn lock_bid_funds(
         ctx: Context<LockBidFunds>,
         max_locked_amount: u64,
+        ciphertext: Vec<u8>,
     ) -> Result<()> {
         let auction = &mut ctx.accounts.auction;
         let now = Clock::get()?.unix_timestamp;
@@ -60,10 +63,19 @@ pub mod sealed_auction {
         escrow.max_locked_amount = max_locked_amount;
         escrow.withdrawn = false;
         escrow.bump = ctx.bumps.bid_escrow;
+        escrow.ciphertext = ciphertext;
 
-        // Transfer SOL into PDA
-        **ctx.accounts.bid_escrow.to_account_info().try_borrow_mut_lamports()? += max_locked_amount;
-        **ctx.accounts.bidder.to_account_info().try_borrow_mut_lamports()? -= max_locked_amount;
+        // Transfer SOL into PDA via System Program
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.bidder.to_account_info(),
+                    to: ctx.accounts.bid_escrow.to_account_info(),
+                },
+            ),
+            max_locked_amount,
+        )?;
 
         Ok(())
     }
@@ -74,13 +86,12 @@ pub mod sealed_auction {
         winning_amount: u64,
         proof: ArciumProof,
     ) -> Result<()> {
-        let auction = &ctx.accounts.auction;
+        let auction = &mut ctx.accounts.auction;
         let now = Clock::get()?.unix_timestamp;
 
         require!(now > auction.end_time, AuctionError::AuctionNotEnded);
         require!(!auction.settled, AuctionError::AlreadySettled);
 
-        // --- Verify Arcium Attestation ---
         // --- Verify Arcium Attestation ---
         // TODO: Implement proper hash and ed25519 verification. 
         // Note: solana_program types might need to be imported directly or logic revised for on-chain verification (e.g. Ed25519 Sig Verify IX).
@@ -113,9 +124,17 @@ pub mod sealed_auction {
         );
 
         // --- Transactions ---
-        // Transfer winning amount to seller
-        **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += winning_amount;
+        // 1. Calculate and Refund Excess to Winner
+        let refund = ctx.accounts.winner_bid_escrow.max_locked_amount - winning_amount;
+        
+        if refund > 0 {
+             **ctx.accounts.winner_bid_escrow.to_account_info().try_borrow_mut_lamports()? -= refund;
+             **ctx.accounts.winner.to_account_info().try_borrow_mut_lamports()? += refund;
+        }
+
+        // 2. Pay Seller
         **ctx.accounts.winner_bid_escrow.to_account_info().try_borrow_mut_lamports()? -= winning_amount;
+        **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += winning_amount;
 
         // NFT → winner
         token::transfer(
@@ -123,8 +142,8 @@ pub mod sealed_auction {
             1,
         )?;
         
-        // Re-borrow auction to set settled flag
-        ctx.accounts.auction.settled = true;
+        // Mark settled
+        auction.settled = true;
 
         Ok(())
     } 
@@ -136,6 +155,8 @@ pub mod sealed_auction {
         require!(!escrow.withdrawn, AuctionError::AlreadyWithdrawn);
         require!(auction.settled, AuctionError::AuctionNotSettled);
 
+        escrow.withdrawn = true;
+        
         // Account is closed automatically, sending all funds to bidder.
         Ok(())
     }

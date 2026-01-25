@@ -31,4 +31,7 @@ pub enum AuctionError {
 
     #[msg("Auction end time must be in the future")]
     InvalidEndTime,
+
+    #[msg("Minimum price must be greater than zero")]
+    InvalidMinPrice,
 }

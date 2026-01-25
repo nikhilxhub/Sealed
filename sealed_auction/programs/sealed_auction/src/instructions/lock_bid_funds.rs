@@ -19,7 +19,7 @@ pub struct LockBidFunds<'info> {
         payer = bidder,
         seeds = [b"bid_escrow", auction.key().as_ref(), bidder.key().as_ref()],
         bump,
-        space = 8 + 32 + 32 + 8 + 1 + 1
+        space = 8 + 32 + 32 + 8 + 1 + 1 + 4 + 128
     )]
     pub bid_escrow: Account<'info, BidEscrow>,
 
