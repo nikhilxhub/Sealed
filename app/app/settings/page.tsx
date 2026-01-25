@@ -36,7 +36,8 @@ export default function SettingsPage() {
         outbid: true,
         auctionWon: true,
     });
-    const [currency, setCurrency] = React.useState<"ETH" | "USD">("ETH");
+
+    const [currency, setCurrency] = React.useState<"SOL" | "USD">("SOL");
     const [wallet, setWallet] = React.useState("0x7a...9c21"); // Mock connected wallet
 
     const handleNotificationChange = (key: keyof typeof notifications) => (val: boolean) => {
@@ -93,10 +94,10 @@ export default function SettingsPage() {
                         <span className="font-sans text-sm text-[#B5B8C1]">Currency Display</span>
                         <div className="flex gap-4">
                             <button
-                                onClick={() => { setCurrency("ETH"); showSaved(); }}
-                                className={`text-sm ${currency === "ETH" ? "text-white underline" : "text-[#6B6E76]"}`}
+                                onClick={() => { setCurrency("SOL"); showSaved(); }}
+                                className={`text-sm ${currency === "SOL" ? "text-white underline" : "text-[#6B6E76]"}`}
                             >
-                                ETH
+                                SOL
                             </button>
                             <button
                                 onClick={() => { setCurrency("USD"); showSaved(); }}

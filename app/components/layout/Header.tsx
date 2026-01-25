@@ -23,23 +23,26 @@ export function Header() {
     }, [pathname]);
 
     const navLinks = [
-        { href: "/explore", label: "Explore" },
+        { href: "/how-it-works", label: "Protocol" },
+        { href: "/explore", label: "Auctions" },
         { href: "/activity", label: "My Activity" },
         // { href: "/create", label: "Create" }, // Skipped for now
     ];
+
+    const isAuctionPage = pathname.startsWith("/auctions/");
 
     return (
         <header
             className={`
                 fixed top-0 left-0 right-0 z-40 transition-all duration-300
-                ${isScrolled ? "bg-[#0E0F12]/95 backdrop-blur-sm border-b border-[#24262D]" : "bg-transparent"}
+                ${isScrolled || isAuctionPage ? "bg-[#050505] border-b border-[#333333]" : "bg-transparent"}
             `}
         >
             <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
 
                 {/* Logo */}
                 <Link href="/" className="font-display text-2xl text-white tracking-tight z-50">
-                    Sealed
+                    Sealed Bid
                 </Link>
 
                 {/* Desktop Nav */}
@@ -49,7 +52,7 @@ export function Header() {
                             key={link.href}
                             href={link.href}
                             className={`
-                                text-sm font-medium transition-colors hover:text-white
+                                text-sm font-medium transition-colors hover:text-white hover:underline underline-offset-4
                                 ${pathname === link.href ? "text-white" : "text-[#B5B8C1]"}
                             `}
                         >
@@ -65,7 +68,7 @@ export function Header() {
                     </Link>
                     <div className="flex items-center gap-2 px-3 py-1.5 border border-[#24262D] rounded-full">
                         <div className="w-2 h-2 rounded-full bg-[#EDEDED]"></div>
-                        <span className="text-xs font-mono text-white">0x7a...9c21</span>
+                        <span className="text-xs font-mono text-white">9..5JML</span>
                     </div>
                 </div>
 

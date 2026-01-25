@@ -1,28 +1,27 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Poppins } from "next/font/google";
-import { ToastProvider } from "../components/ui/Toast";
-import { Header } from "../components/layout/Header";
-import { Footer } from "../components/layout/Footer";
 import "./globals.css";
+import { Header } from "@/components/layout/Header";
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-serif",
   subsets: ["latin"],
   weight: ["400"],
-  display: "swap",
 });
 
 const poppins = Poppins({
   variable: "--font-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "Sealed Bid Auction",
   description: "A private financial instrument.",
 };
+
+import { ToastProvider } from "@/components/ui/Toast";
+import { Footer } from "@/components/layout/Footer";
 
 export default function RootLayout({
   children,

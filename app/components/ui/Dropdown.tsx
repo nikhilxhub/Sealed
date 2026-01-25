@@ -39,21 +39,22 @@ export function Dropdown({ options, value, onChange, placeholder = "Select...", 
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={`
-          flex items-center justify-between w-full px-4 py-3
-          bg-transparent border border-[#24262D] rounded-sm
+          flex items-center justify-between w-full px-0 py-2
+          bg-transparent border-none
           text-sm text-left
-          focus:outline-none focus:border-white focus:ring-0
-          transition-colors duration-160
-          ${isOpen ? "border-white" : ""}
+          focus:outline-none focus:ring-0
+          transition-all duration-200
+          hover:text-white
+          ${isOpen ? "text-white" : "text-[#B5B8C1]"}
         `}
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
             >
-                <span className={value ? "text-white" : "text-[#B5B8C1]"}>
+                <span className={value ? "text-white" : "text-inherit"}>
                     {selectedLabel || placeholder}
                 </span>
                 <ChevronDown
-                    className={`w-4 h-4 text-[#B5B8C1] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    className={`w-3 h-3 ml-2 text-inherit opacity-60 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
                 />
             </button>
 

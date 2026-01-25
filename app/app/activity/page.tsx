@@ -10,7 +10,7 @@ const ACTIVITY_DATA: Array<{ id: string, type: string, asset: string, status: st
 
 export default function ActivityPage() {
     return (
-        <main className="min-h-screen p-6 md:p-12 max-w-[1200px] mx-auto pt-24 animate-fade-in">
+        <main className="min-h-screen px-6 md:px-12 pt-32 md:pt-30 max-w-[1200px] mx-auto animate-fade-in">
             <div className="mb-16">
                 <h1 className="font-display text-4xl text-white mb-3">My Activity</h1>
                 <p className="font-sans text-[#B5B8C1] text-sm">
@@ -50,6 +50,13 @@ export default function ActivityPage() {
                         <p className="font-sans text-[#B5B8C1] mb-8">
                             Place your first bid or create an auction to begin.
                         </p>
+                        <Link
+                            href="/create"
+                            className="text-[#EDEDED] hover:text-white hover:underline decoration-1 underline-offset-4 font-medium transition-colors"
+                        >
+                            Create Auction
+                        </Link>
+                        <span className="text-[#333333] mx-2">|</span>
                         <Link
                             href="/explore"
                             className="text-[#EDEDED] hover:text-white hover:underline decoration-1 underline-offset-4 font-medium transition-colors"

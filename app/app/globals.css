@@ -1,10 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-serif: var(--font-serif);
-  --font-sans: var(--font-sans);
+  --font-serif: "Instrument Serif", serif;
+  --font-sans: "Poppins", sans-serif;
 
   /* Colors based on Brief */
   --color-background: #0E0F12;
@@ -118,8 +120,9 @@ body {
 
 /* Typography Utility Classes */
 .font-display {
-  font-family: var(--font-serif);
-  letter-spacing: -0.01em;
+  font-family: "Instrument Serif", serif;
+  font-weight: 400;
+  letter-spacing: -0.03em;
   line-height: 1.1;
 }
 
@@ -145,4 +148,18 @@ body {
 :focus-visible {
   outline: 2px solid #EDEDED;
   outline-offset: 2px;
+}
+
+/* Hide spin buttons for input type number */
+/* Chrome, Safari, Edge, Opera */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

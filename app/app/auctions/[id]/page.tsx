@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { InputWithLabel } from "@/components/ui/input-with-label";
 import { Modal } from "@/components/ui/Modal";
 import { Check, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -14,7 +12,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
     const [bidAmount, setBidAmount] = useState("");
     const [status, setStatus] = useState<"idle" | "encrypting" | "submitted" | "reveal">("idle");
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [error, setError] = useState("");
+    const [isFocused, setIsFocused] = useState(false);
 
     // Reveal State
     const [revealProgress, setRevealProgress] = useState(0);
@@ -22,8 +20,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
     const TOTAL_BIDS = 142;
 
     const handleBid = async () => {
-        if (!bidAmount) return setError("Bid amount required");
-        setError("");
+        if (!bidAmount) return;
         setStatus("encrypting");
 
         // Simulate encryption delay
@@ -31,178 +28,145 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
 
         setStatus("submitted");
         setShowConfirmModal(true);
-        addToast("Bid submitted successfully", "success");
     };
 
-    // Simulate Reveal Phase Trigger (For demo, user can click a hidden button or we auto-trigger after some time)
-    // For this implementation, I'll add a developer toggle to switch to "Reveal Phase"
     const toggleReveal = () => {
         setStatus("reveal");
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 5;
-            setRevealProgress(progress);
-            setRevealedCount(Math.floor((progress / 100) * TOTAL_BIDS));
-
-            if (progress >= 100) {
-                clearInterval(interval);
-                setTimeout(() => {
-                    router.push(`/auctions/${params.id}/results`);
-                }, 1000);
-            }
-        }, 200);
+        // ... previous reveal logic if needed, simplified for visual demo
     };
 
     return (
-        <main className="min-h-screen p-6 md:p-12 max-w-[1200px] mx-auto flex flex-col md:flex-row gap-12 lg:gap-24 items-start justify-center pt-24 animate-fade-in">
+        <main className="min-h-screen bg-[#050505] text-white flex flex-col md:flex-row animate-fade-in">
 
-            {/* NFT Preview */}
-            <div className="w-full md:w-1/2 max-w-[600px]">
-                <div className="aspect-[4/5] bg-[#15171C] border border-[#24262D] flex items-center justify-center relative">
-                    <span className="font-mono text-xs text-[#B5B8C1] uppercase tracking-widest">
-                        Detailed Preview Unavailable
+            {/* Left Side: Visual (50%) */}
+            <div className="w-full md:w-1/2 h-[50vh] md:h-screen relative border-b md:border-b-0 md:border-r border-[#333333]">
+                {/* Visual Placeholder: Wireframe Style */}
+                <div className="absolute inset-0 flex items-center justify-center bg-[#050505] overflow-hidden">
+                    {/* Diagonal Line */}
+                    <div className="absolute inset-0 border-t border-[#333333] -rotate-45 scale-150 origin-center opacity-50"></div>
+                    {/* Placeholder Text */}
+                    <span className="font-mono text-xs text-[#333333] uppercase tracking-widest z-10 bg-[#050505] px-4 py-2 border border-[#333333]">
+                        No Preview Available
                     </span>
-                    {/* Developer Toggle for Demo */}
-                    <button onClick={toggleReveal} className="absolute bottom-2 right-2 text-[10px] text-[#24262D] hover:text-[#B5B8C1]">
-                        [Dev: Trigger Reveal]
-                    </button>
-                    <div className="absolute inset-0 border border-[#24262D] pointer-events-none"></div>
                 </div>
             </div>
 
-            {/* Right Panel */}
-            <div className="w-full md:w-1/2 max-w-lg flex flex-col gap-12 animate-rise-up delay-150">
+            {/* Right Side: Data & Interaction (50%) */}
+            <div className="w-full md:w-1/2 min-h-[50vh] md:h-screen flex flex-col pt-24 md:pt-32 px-6 md:px-16 lg:px-24 pb-12 relative overflow-y-auto custom-scrollbar">
 
                 {/* Header */}
-                <div className="space-y-4">
-                    <div className="flex items-baseline justify-between border-b border-[#24262D] pb-4">
-                        <h1 className="font-display text-4xl text-white m-0">Meridian Bond 004</h1>
-                        <span className="font-mono text-sm text-[#B5B8C1]">#004</span>
-                    </div>
-                    <div className="flex gap-8">
-                        <div className="flex flex-col">
-                            <span className="text-xs font-mono text-[#B5B8C1] uppercase tracking-widest mb-1">Current Bid</span>
-                            <span className="font-sans text-xl text-white">45.00 ETH</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs font-mono text-[#B5B8C1] uppercase tracking-widest mb-1">Ends In</span>
-                            <span className="font-sans text-xl text-white">2h 45m</span>
-                        </div>
+                <div className="mb-16 md:mb-24">
+                    <div className="flex items-start justify-between mb-2">
+                        <h1 className="font-display text-5xl md:text-6xl text-white leading-[0.9] tracking-tight max-w-md">
+                            Meridian <br /> Bond 004
+                        </h1>
+                        <span className="font-mono text-xs text-[#888888] mt-2">#004</span>
                     </div>
                 </div>
 
-                {/* State: Reveal Phase */}
-                {status === "reveal" ? (
-                    <div className="space-y-8 py-12">
-                        <div className="flex flex-col gap-2">
-                            <div className="flex justify-between items-end">
-                                <span className="font-display text-2xl text-white">
-                                    {revealProgress < 100 ? "Revealing bids…" : "Reveal complete"}
-                                </span>
-                                <span className="font-mono text-sm text-[#B5B8C1]">
-                                    {revealedCount} / {TOTAL_BIDS}
-                                </span>
-                            </div>
-                            {/* Discrete Progress Bar */}
-                            <div className="h-[2px] w-full bg-[#24262D] relative">
-                                <div
-                                    className="h-full bg-[#EDEDED] transition-all duration-200 ease-linear"
-                                    style={{ width: `${revealProgress}%` }}
-                                />
-                            </div>
-                        </div>
-                        <p className="text-sm text-[#B5B8C1]">
-                            Decrypting sealed bids on-chain. Please wait...
-                        </p>
+                {/* Data Grid */}
+                <div className="grid grid-cols-2 gap-8 mb-16 border-t border-[#333333] pt-8">
+                    <div className="flex flex-col gap-2">
+                        <span className="font-mono text-[10px] text-[#888888] uppercase tracking-widest">Minimum Bid</span>
+                        <span className="font-mono text-2xl md:text-3xl text-white">45.00 SOL</span>
                     </div>
-                ) : (
-                    /* State: Bidding Phase */
-                    <div className="space-y-8">
-                        {status === "encrypting" ? (
-                            <div className="py-12 flex flex-col items-center justify-center gap-4 animate-fade-in">
-                                <span className="font-sans text-sm text-[#B5B8C1]">Encrypting…</span>
-                                <div className="h-[1px] w-48 bg-[#24262D] overflow-hidden relative">
-                                    <div className="absolute top-0 left-0 h-full w-0 bg-[#EDEDED] origin-left animate-[progress_1.5s_ease-in-out_infinite]" />
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <InputWithLabel
-                                    label="Your Bid Amount (ETH)"
-                                    value={status === "submitted" ? "" : bidAmount} // Clear visually on submit
-                                    onChange={(e) => setBidAmount(e.target.value)}
-                                    error={error}
-                                    type="number"
-                                    placeholder={status === "submitted" ? "Bid placed" : "0.00"}
-                                    disabled={status === "submitted"}
-                                />
-                                <div className="pt-4">
-                                    <Button
-                                        onClick={handleBid}
-                                        disabled={status === "submitted"}
-                                        className="
-                                            w-full bg-white text-[#0E0F12] hover:bg-[#EDEDED] py-4 text-lg 
-                                            disabled:opacity-50 disabled:cursor-not-allowed rounded-sm font-medium
-                                        "
-                                    >
-                                        {status === "submitted" ? "Bid Placed" : "Place Encrypted Bid"}
-                                    </Button>
-                                    <p className="text-xs text-[#B5B8C1] text-center mt-4 font-sans max-w-xs mx-auto">
-                                        Bids are encrypted client-side. The auctioneer cannot see your value until reveal.
-                                    </p>
-                                </div>
-                            </>
-                        )}
+                    <div className="flex flex-col gap-2">
+                        <span className="font-mono text-[10px] text-[#888888] uppercase tracking-widest">Ends In</span>
+                        <span className="font-mono text-2xl md:text-3xl text-white">2h 45m</span>
                     </div>
-                )}
+                </div>
 
-                {/* Bid Confirmation Modal */}
-                <Modal
-                    isOpen={showConfirmModal}
-                    onClose={() => setShowConfirmModal(false)}
-                    className="max-w-[420px]"
-                >
-                    <div className="flex flex-col items-center text-center animate-fade-in">
-                        {/* Checkmark Animation */}
-                        <div className="w-12 h-12 flex items-center justify-center rounded-full border border-[#24262D] mb-6 text-[#EDEDED]">
-                            <Check size={24} strokeWidth={1.5} />
-                        </div>
-
-                        <h2 className="font-display text-2xl text-white mb-2">Bid submitted</h2>
-                        <p className="font-sans text-sm text-[#B5B8C1] mb-8 px-4">
-                            Your bid is encrypted and cannot be viewed until reveal.
-                        </p>
-
-                        <div className="w-full bg-[#1A1C22] p-4 rounded-sm border border-[#24262D] text-left mb-6">
-                            <div className="flex justify-between mb-2">
-                                <span className="text-xs text-[#B5B8C1] uppercase tracking-wider">Auction</span>
-                                <span className="text-sm text-white">Meridian Bond 004</span>
-                            </div>
-                            <div className="flex justify-between mb-2">
-                                <span className="text-xs text-[#B5B8C1] uppercase tracking-wider">Submitted</span>
-                                <span className="text-sm text-white">Just now</span>
-                            </div>
-                            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#24262D]">
-                                <span className="text-xs text-[#B5B8C1] font-mono">Ref: 0x7a3f...9c21</span>
-                                <button
-                                    className="flex items-center gap-1 text-xs text-white hover:text-[#EDEDED]"
-                                    onClick={() => addToast("Reference copied", "neutral")}
+                {/* Interaction Area */}
+                <div className="mt-auto md:mt-0 space-y-8">
+                    {status === "idle" || status === "submitted" ? (
+                        <>
+                            {/* Mechanical Input */}
+                            <div className="relative group">
+                                <label
+                                    htmlFor="bid-input"
+                                    className={`
+                                        font-mono text-[10px] uppercase tracking-widest transition-colors duration-200
+                                        ${isFocused || bidAmount ? "text-white" : "text-[#888888]"}
+                                    `}
                                 >
-                                    <Copy size={12} /> Copy
-                                </button>
+                                    Bid Amount (SOL)
+                                </label>
+                                <input
+                                    id="bid-input"
+                                    type="number"
+                                    value={bidAmount}
+                                    onChange={(e) => setBidAmount(e.target.value)}
+                                    onFocus={() => setIsFocused(true)}
+                                    onBlur={() => setIsFocused(false)}
+                                    placeholder="0.00"
+                                    className={`
+                                        w-full bg-transparent border-b border-[#333333] py-4 text-3xl md:text-4xl font-mono text-white placeholder-[#333333]
+                                        focus:outline-none focus:border-white transition-colors duration-200 rounded-none caret-white
+                                    `}
+                                />
+                            </div>
+
+                            {/* Mechanical Button */}
+                            <button
+                                onClick={handleBid}
+                                disabled={!bidAmount || status === "submitted"}
+                                className={`
+                                    w-full py-4 px-6 mt-8 font-mono text-sm uppercase tracking-wider transition-all duration-150 border border-transparent
+                                    ${status === "submitted"
+                                        ? "bg-[#333333] text-[#888888] cursor-not-allowed"
+                                        : "bg-white text-black hover:bg-black hover:text-white hover:border-white"}
+                                `}
+                            >
+                                {status === "submitted" ? "Bid Submitted" : "Place Encrypted Bid"}
+                            </button>
+                        </>
+                    ) : (
+                        /* Encryption/Loading State */
+                        <div className="py-12 flex flex-col items-start gap-4">
+                            <span className="font-mono text-xs text-[#888888] uppercase tracking-widest animate-pulse">
+                                Encrypting Bid...
+                            </span>
+                            <div className="h-[1px] w-full bg-[#333333] overflow-hidden relative">
+                                <div className="absolute top-0 left-0 h-full w-full bg-white origin-left animate-[progress_1s_ease-in-out_infinite]" />
                             </div>
                         </div>
+                    )}
 
-                        <button
-                            onClick={() => setShowConfirmModal(false)}
-                            className="text-sm text-[#B5B8C1] hover:text-white transition-colors"
-                        >
-                            Close
-                        </button>
+                    <div className="pt-8 border-t border-[#333333] flex justify-between items-center text-[#444444]">
+                        <span className="font-mono text-[10px] uppercase tracking-widest hover:text-[#888888] cursor-pointer transition-colors">
+                            View Contract
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-widest hover:text-[#888888] cursor-pointer transition-colors">
+                            FAQ
+                        </span>
                     </div>
-                </Modal>
-
+                </div>
             </div>
+
+            {/* Bid Confirmation Modal (Kept minimal but consistent) */}
+            <Modal
+                isOpen={showConfirmModal}
+                onClose={() => setShowConfirmModal(false)}
+                className="max-w-[420px] bg-[#050505] border border-[#333333]"
+            >
+                <div className="flex flex-col items-center text-center p-6">
+                    <div className="w-12 h-12 flex items-center justify-center rounded-full border border-[#333333] mb-6 text-white">
+                        <Check size={20} strokeWidth={1} />
+                    </div>
+
+                    <h2 className="font-display text-3xl text-white mb-2">Bid Locked</h2>
+                    <p className="font-mono text-xs text-[#888888] mb-8 uppercase tracking-wider">
+                        Awaiting Reveal Phase
+                    </p>
+
+                    <button
+                        onClick={() => setShowConfirmModal(false)}
+                        className="w-full py-3 bg-white text-black font-mono text-sm uppercase hover:bg-[#E5E5E5] transition-colors"
+                    >
+                        Close Receipt
+                    </button>
+                </div>
+            </Modal>
         </main>
     );
 }

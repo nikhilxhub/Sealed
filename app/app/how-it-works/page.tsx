@@ -82,7 +82,7 @@ export default function HowItWorksPage() {
     }, []);
 
     return (
-        <main className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto pt-24">
+        <main className="min-h-screen px-6 md:px-12 pt-32 md:pt-30 max-w-4xl mx-auto">
             <header className="mb-24 opacity-0 animate-fade-in">
                 <h1 className="font-display text-5xl mb-6">How It Works</h1>
                 <p className="font-sans text-foreground/60 max-w-xl text-lg leading-relaxed">
@@ -97,16 +97,15 @@ export default function HowItWorksPage() {
                         key={step.id}
                         ref={(el) => { stepRefs.current[i] = el; }}
                         data-index={step.id}
-                        className={`transition-all duration-400 ease-in-out ${
-                            activeStep === step.id 
-                                ? "opacity-100 translate-y-0" 
-                                : activeStep > step.id
+                        className={`transition-all duration-400 ease-in-out ${activeStep === step.id
+                            ? "opacity-100 translate-y-0"
+                            : activeStep > step.id
                                 ? "opacity-30 translate-y-0"
                                 : "opacity-20 translate-y-4 pointer-events-none"
-                        }`}
+                            }`}
                     >
-                        <div 
-                            className="absolute -left-[5px] w-[9px] h-[9px] rounded-full bg-foreground mt-2 transition-opacity duration-400"
+                        <div
+                            className="absolute -left-[calc(3rem+5px)] md:-left-[calc(6rem+5px)] w-[9px] h-[9px] rounded-full bg-foreground mt-2 transition-opacity duration-400"
                             style={{ opacity: activeStep === step.id ? 1 : activeStep > step.id ? 0.3 : 0.1 }}
                         />
 

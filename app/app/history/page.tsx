@@ -16,9 +16,9 @@ type Transaction = {
 
 // Mock Data
 const TRANSACTIONS: Transaction[] = [
-    { id: "1", date: "Oct 24, 2025", action: "Bid Submitted", auction: "Cosmic Debris #04", amount: "1.2 ETH", status: "live", txHash: "0x7a...9c21" },
-    { id: "2", date: "Oct 22, 2025", action: "Bid Returned", auction: "Neural Gates", amount: "0.8 ETH", status: "outbid", txHash: "0x8b...1d42" },
-    { id: "3", date: "Oct 15, 2025", action: "Auction Won", auction: "Abstract Flow", amount: "2.5 ETH", status: "won", txHash: "0x9c...2e53" },
+    { id: "1", date: "Oct 24, 2025", action: "Bid Submitted", auction: "Cosmic Debris #04", amount: "1.2 SOL", status: "live", txHash: "0x7a...9c21" },
+    { id: "2", date: "Oct 22, 2025", action: "Bid Returned", auction: "Neural Gates", amount: "0.8 SOL", status: "outbid", txHash: "0x8b...1d42" },
+    { id: "3", date: "Oct 15, 2025", action: "Auction Won", auction: "Abstract Flow", amount: "2.5 SOL", status: "won", txHash: "0x9c...2e53" },
     { id: "4", date: "Oct 10, 2025", action: "Auction Created", auction: "Genesis Block", amount: "-", status: "ended", txHash: "0x1d...4f64" },
 ];
 

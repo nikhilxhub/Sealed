@@ -10,7 +10,7 @@ const OUTCOME = {
     title: "Meridian Bond 004",
     id: "1",
     winner: "0x3f...8291",
-    winningBid: "52.50 ETH",
+    winningBid: "52.50 SOL",
     userStatus: "winner", // 'winner' | 'outbid' | 'seller' | 'observer'
     txHash: "0x7a3f...9c21"
 };
