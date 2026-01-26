@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 
 import { ToastProvider } from "@/components/ui/Toast";
 import { Footer } from "@/components/layout/Footer";
+import { WalletContextProvider } from "@/components/providers/WalletContextProvider";
 
 export default function RootLayout({
   children,
@@ -33,13 +34,15 @@ export default function RootLayout({
       <body
         className={`${instrumentSerif.variable} ${poppins.variable} antialiased bg-background text-foreground flex flex-col min-h-screen`}
       >
-        <ToastProvider>
-          <Header />
-          <div className="flex-1 w-full">
-            {children}
-          </div>
-          <Footer />
-        </ToastProvider>
+        <WalletContextProvider>
+          <ToastProvider>
+            <Header />
+            <div className="flex-1 w-full">
+              {children}
+            </div>
+            <Footer />
+          </ToastProvider>
+        </WalletContextProvider>
       </body>
     </html>
   );

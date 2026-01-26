@@ -48,6 +48,10 @@ pub struct SettleAuction<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    
+    /// CHECK: We inspect this sysvar to verify the Ed25519 signature instruction
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> SettleAuction<'info> {

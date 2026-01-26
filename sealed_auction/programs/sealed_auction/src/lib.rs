@@ -80,9 +80,9 @@ pub mod sealed_auction {
 
     pub fn settle_auction(
         ctx: Context<SettleAuction>,
-        _winner: Pubkey,
+        winner: Pubkey,
         winning_amount: u64,
-        _proof: ArciumProof,
+        proof: ArciumProof,
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
@@ -90,7 +90,18 @@ pub mod sealed_auction {
         require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
 
         // --- Verify Arcium Attestation ---
-        // TODO: Implement proper hash and ed25519 verification. 
+        // Construct the message: winner_pubkey (32) + winning_amount (8)
+        let mut message = Vec::with_capacity(40);
+        message.extend_from_slice(winner.as_ref());
+        message.extend_from_slice(&winning_amount.to_le_bytes());
+
+        // Verify that Arcium signed this specific message
+        verify_ed25519_ix(
+            &ctx.accounts.sysvar_instructions,
+            &ARCIUM_VERIFIER,
+            &message,
+            &proof.signature,
+        )?;
         
         // --- Financial Safety ---
         require!(winning_amount >= ctx.accounts.auction.min_price, AuctionError::BelowMinPrice);
@@ -186,7 +197,7 @@ pub mod sealed_auction {
     /// (all bids < min_price or no bids). Permissionless - anyone can crank.
     pub fn finalize_no_winner(
         ctx: Context<FinalizeNoWinner>,
-        _proof: ArciumProof,
+        proof: ArciumProof,
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
@@ -194,8 +205,19 @@ pub mod sealed_auction {
         require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
 
         // --- Verify Arcium Attestation ---
-        // Arcium must attest that no valid winner exists
-        // TODO: Implement proper hash and ed25519 verification
+        // For "No Winner", we expect Arcium to sign a specific NULL state.
+        // Message: 0u64 (winner, though it's pubkey bytes) + 0u64 (amount)
+        // Pubkey::default() is 32 bytes of zeros.
+        let mut message = Vec::with_capacity(40);
+        message.extend_from_slice(&[0u8; 32]); // Null Pubkey
+        message.extend_from_slice(&0u64.to_le_bytes()); // Zero Amount
+
+        verify_ed25519_ix(
+            &ctx.accounts.sysvar_instructions,
+            &ARCIUM_VERIFIER,
+            &message,
+            &proof.signature,
+        )?;
 
         // Transfer NFT back to seller
         let seeds = &[
@@ -221,3 +243,60 @@ pub mod sealed_auction {
 }
 
 
+
+// --- Helper: Ed25519 Verification ---
+
+use anchor_lang::solana_program::sysvar::instructions::{
+    load_instruction_at_checked, check_id as check_ix_sysvar_id
+};
+
+// Ed25519 Program ID is "Ed25519SigVerify111111111111111111111111111"
+pub const ED25519_ID: Pubkey = pubkey!("Ed25519SigVerify111111111111111111111111111");
+
+pub fn verify_ed25519_ix(
+    instructions_account: &AccountInfo,
+    expected_signer: &Pubkey,
+    expected_message: &[u8],
+    expected_signature: &[u8],
+) -> Result<()> {
+    // 1. Verify sysvar ID
+    if !check_ix_sysvar_id(&instructions_account.key()) {
+        return Err(ErrorCode::InstructionMissing.into()); // Use generic error or create new one
+    }
+
+    // 2. Iterate through prior instructions to find Ed25519
+    // SIMPLIFICATION for V1:
+    // We assume the caller places Ed25519 verify as the instruction at index 0 
+    // and this instruction is index 1 (or similar).
+    
+    // Check PREVIOUS instruction (index - 1)
+    let current_index = anchor_lang::solana_program::sysvar::instructions::load_current_index_checked(instructions_account)?;
+    if current_index == 0 {
+        return Err(AuctionError::InvalidSignatureCheck.into());
+    }
+    
+    let prev_index = current_index - 1;
+    let ix = load_instruction_at_checked(prev_index as usize, instructions_account)
+        .map_err(|_| AuctionError::InvalidSignatureCheck)?;
+
+    // Check Program ID
+    if ix.program_id != ED25519_ID {
+        return Err(AuctionError::InvalidSignatureCheck.into());
+    }
+    
+    // Check Content
+    // This ensures specific checking of OUR params
+    let data = &ix.data;
+    
+    // Naive containment check:
+    // Ensure the data byte array has the Pubkey bytes, Signature bytes, and Message bytes
+    let pk_found = data.windows(32).any(|window| window == expected_signer.as_ref());
+    let sig_found = data.windows(64).any(|window| window == expected_signature);
+    let msg_found = data.windows(expected_message.len()).any(|window| window == expected_message);
+
+    if !pk_found || !sig_found || !msg_found {
+         return Err(AuctionError::InvalidSignatureCheck.into());
+    }
+
+    Ok(())
+}

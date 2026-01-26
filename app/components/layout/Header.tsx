@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Wallet, ChevronRight } from "lucide-react";
+import { Menu, X, ChevronRight } from "lucide-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 export function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -66,10 +67,17 @@ export function Header() {
                     <Link href="/settings" className="text-sm text-[#B5B8C1] hover:text-white transition-colors">
                         Settings
                     </Link>
-                    <div className="flex items-center gap-2 px-3 py-1.5 border border-[#24262D] rounded-full">
-                        <div className="w-2 h-2 rounded-full bg-[#EDEDED]"></div>
-                        <span className="text-xs font-mono text-white">9..5JML</span>
-                    </div>
+                    <WalletMultiButton style={{
+                        backgroundColor: 'transparent',
+                        border: '1px solid #24262D',
+                        borderRadius: '9999px', // rounded-full
+                        padding: '6px 12px',
+                        height: 'auto',
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        color: 'white',
+                        lineHeight: '1',
+                    }} />
                 </div>
 
                 {/* Mobile Toggle */}
@@ -113,16 +121,19 @@ export function Header() {
                         </Link>
                     </nav>
 
-                    <div className="mt-auto mb-12 opacity-0 animate-fade-in delay-500">
-                        <div className="flex items-center gap-3 p-4 border border-[#24262D] rounded-sm">
-                            <Wallet size={20} className="text-[#EDEDED]" />
-                            <span className="font-mono text-sm text-white">0x7a...9c21</span>
-                            <div className="ml-auto w-2 h-2 rounded-full bg-[#EDEDED]" />
-                        </div>
+                    <div className="mt-auto mb-12 opacity-0 animate-fade-in delay-500 w-full flex justify-center">
+                        <WalletMultiButton style={{
+                            backgroundColor: '#0E0F12',
+                            border: '1px solid #24262D',
+                            width: '100%',
+                            justifyContent: 'center',
+                            borderRadius: '4px'
+                        }} />
                     </div>
                 </div>
 
             </div>
         </header>
     );
+
 }

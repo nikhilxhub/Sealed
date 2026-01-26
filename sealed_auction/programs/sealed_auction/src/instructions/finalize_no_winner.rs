@@ -35,6 +35,10 @@ pub struct FinalizeNoWinner<'info> {
     pub seller_nft_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+    
+    /// CHECK: We inspect this sysvar to verify the Ed25519 signature instruction
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> FinalizeNoWinner<'info> {

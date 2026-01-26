@@ -34,4 +34,7 @@ pub enum AuctionError {
 
     #[msg("Minimum price must be greater than zero")]
     InvalidMinPrice,
+
+    #[msg("Ed25519 Signature Verification Failed")]
+    InvalidSignatureCheck,
 }
