@@ -3,15 +3,20 @@ use anchor_spl::token::{Token, TokenAccount, Transfer};
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CancelAuction<'info> {
+pub struct FinalizeNoWinner<'info> {
+    /// Anyone can crank this - permissionless
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    /// CHECK: Safe - we verify this matches auction.seller
     #[account(mut, address = auction.seller)]
-    pub seller: Signer<'info>,
+    pub seller: UncheckedAccount<'info>,
 
     #[account(
         mut,
         seeds = [b"auction", auction.nft_mint.as_ref()],
         bump = auction.bump,
-        close = seller
+        // Note: Do NOT close here - auction must remain for refund_loser checks
     )]
     pub auction: Account<'info, Auction>,
 
@@ -32,7 +37,7 @@ pub struct CancelAuction<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> CancelAuction<'info> {
+impl<'info> FinalizeNoWinner<'info> {
     pub fn into_transfer_back_to_seller(
         &self,
     ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::state::*;
-use crate::errors::*;
+
 
 #[derive(Accounts)]
 pub struct RefundLoser<'info> {

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount, Mint, Transfer};
 use crate::state::*;
-use crate::errors::*;
+
 
 #[derive(Accounts)]
 pub struct SettleAuction<'info> {

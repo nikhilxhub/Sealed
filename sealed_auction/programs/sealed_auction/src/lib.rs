@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
+use anchor_spl::token::{self};
 use anchor_lang::system_program;
 
 mod state;
@@ -49,7 +49,6 @@ pub mod sealed_auction {
     pub fn lock_bid_funds(
         ctx: Context<LockBidFunds>,
         max_locked_amount: u64,
-        ciphertext: Vec<u8>,
     ) -> Result<()> {
         let auction = &mut ctx.accounts.auction;
         let now = Clock::get()?.unix_timestamp;
@@ -63,7 +62,6 @@ pub mod sealed_auction {
         escrow.max_locked_amount = max_locked_amount;
         escrow.withdrawn = false;
         escrow.bump = ctx.bumps.bid_escrow;
-        escrow.ciphertext = ciphertext;
 
         // Transfer SOL into PDA via System Program
         system_program::transfer(
@@ -82,59 +80,55 @@ pub mod sealed_auction {
 
     pub fn settle_auction(
         ctx: Context<SettleAuction>,
-        winner: Pubkey,
+        _winner: Pubkey,
         winning_amount: u64,
-        proof: ArciumProof,
+        _proof: ArciumProof,
     ) -> Result<()> {
-        let auction = &mut ctx.accounts.auction;
         let now = Clock::get()?.unix_timestamp;
 
-        require!(now > auction.end_time, AuctionError::AuctionNotEnded);
-        require!(!auction.settled, AuctionError::AlreadySettled);
+        require!(now > ctx.accounts.auction.end_time, AuctionError::AuctionNotEnded);
+        require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
 
         // --- Verify Arcium Attestation ---
         // TODO: Implement proper hash and ed25519 verification. 
-        // Note: solana_program types might need to be imported directly or logic revised for on-chain verification (e.g. Ed25519 Sig Verify IX).
-        /*
-        let expected_hash = anchor_lang::solana_program::hash::hashv(&[
-            auction.key().as_ref(),
-            winner.as_ref(),
-            &winning_amount.to_le_bytes(),
-        ]);
-
-        require!(
-            expected_hash.to_bytes() == proof.message_hash,
-            AuctionError::InvalidArciumProof
-        );
-
-        let verified = anchor_lang::solana_program::ed25519_program::verify(
-            &proof.signature,
-            proof.message_hash.as_ref(),
-            ARCIUM_VERIFIER.as_ref(),
-        );
-
-        require!(verified, AuctionError::InvalidArciumProof);
-        */
-
+        
         // --- Financial Safety ---
-        require!(winning_amount >= auction.min_price, AuctionError::BelowMinPrice);
+        require!(winning_amount >= ctx.accounts.auction.min_price, AuctionError::BelowMinPrice);
         require!(
             winning_amount <= ctx.accounts.winner_bid_escrow.max_locked_amount,
             AuctionError::InsufficientEscrow
         );
 
         // --- Transactions ---
-        // 1. Calculate and Refund Excess to Winner
-        let refund = ctx.accounts.winner_bid_escrow.max_locked_amount - winning_amount;
+        // 1. Pay Seller
+        // Uses system_program::transfer with PDA signer
+        let auction_key = ctx.accounts.auction.key();
+        let winner_key = ctx.accounts.winner.key();
         
-        if refund > 0 {
-             **ctx.accounts.winner_bid_escrow.to_account_info().try_borrow_mut_lamports()? -= refund;
-             **ctx.accounts.winner.to_account_info().try_borrow_mut_lamports()? += refund;
-        }
+        let seeds = &[
+            b"bid_escrow",
+            auction_key.as_ref(),
+            winner_key.as_ref(),
+            &[ctx.accounts.winner_bid_escrow.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
 
-        // 2. Pay Seller
-        **ctx.accounts.winner_bid_escrow.to_account_info().try_borrow_mut_lamports()? -= winning_amount;
-        **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += winning_amount;
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.winner_bid_escrow.to_account_info(),
+                    to: ctx.accounts.seller.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            winning_amount,
+        )?;
+
+        // 2. Refund Excess to Winner
+        // Handled automatically by Anchor's `close = winner` constraint.
+        // Any remaining lamports in winner_bid_escrow (max_locked - winning_amount) 
+        // will be sent to the winner when the account closes at end of instruction.
 
         // NFT → winner
         token::transfer(
@@ -143,7 +137,8 @@ pub mod sealed_auction {
         )?;
         
         // Mark settled
-        auction.settled = true;
+        ctx.accounts.winner_bid_escrow.withdrawn = true;
+        ctx.accounts.auction.settled = true;
 
         Ok(())
     } 
@@ -183,6 +178,40 @@ pub mod sealed_auction {
             ctx.accounts.into_transfer_back_to_seller().with_signer(signer),
             1,
         )?;
+
+        Ok(())
+    }
+
+    /// Finalize auction when Arcium determines no valid winner exists
+    /// (all bids < min_price or no bids). Permissionless - anyone can crank.
+    pub fn finalize_no_winner(
+        ctx: Context<FinalizeNoWinner>,
+        _proof: ArciumProof,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+
+        require!(now > ctx.accounts.auction.end_time, AuctionError::AuctionNotEnded);
+        require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
+
+        // --- Verify Arcium Attestation ---
+        // Arcium must attest that no valid winner exists
+        // TODO: Implement proper hash and ed25519 verification
+
+        // Transfer NFT back to seller
+        let seeds = &[
+            b"auction".as_ref(),
+            ctx.accounts.auction.nft_mint.as_ref(),
+            &[ctx.accounts.auction.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        token::transfer(
+            ctx.accounts.into_transfer_back_to_seller().with_signer(signer),
+            1,
+        )?;
+
+        // Mark as settled so bidders can call refund_loser
+        ctx.accounts.auction.settled = true;
 
         Ok(())
     }

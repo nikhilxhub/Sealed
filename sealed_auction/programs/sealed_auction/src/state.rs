@@ -18,7 +18,6 @@ pub struct BidEscrow {
     pub max_locked_amount: u64,
     pub withdrawn: bool,
     pub bump: u8,
-    pub ciphertext: Vec<u8>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
