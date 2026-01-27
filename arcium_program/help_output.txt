@@ -1,0 +1,26 @@
+arcium-deploy 0.6.2
+Deploys the MXE program and initializes its MXE account
+
+USAGE:
+    arcium deploy [FLAGS] [OPTIONS] --cluster-offset <cluster-offset> --keypair-path <keypair-path> --recovery-set-size <recovery-set-size>
+
+FLAGS:
+        --force          Force the deployment and initialization of the MXE even if the recovery set size is not enough
+    -h, --help           Prints help information
+        --skip-deploy    Skip program deployment
+        --skip-init      Skip MXE account initialization
+    -V, --version        Prints version information
+
+OPTIONS:
+    -o, --cluster-offset <cluster-offset>          The cluster for the MXE, identified by its offset
+    -k, --keypair-path <keypair-path>              The keypair to use for all operations
+    -m, --mempool-size <mempool-size>
+            The size of the mempool to initialize. Options: "Tiny", "Small", "Medium", "Large" [default: Tiny]
+
+    -p, --program-keypair <program-keypair>        The program keypair to use for deployment
+    -n, --program-name <program-name>              The program name to deploy (default: mxe)
+    -r, --recovery-set-size <recovery-set-size>    The number of nodes in the recovery set
+    -u, --rpc-url <rpc-url>
+            The Solana cluster to use. Can be specified with a single letter/word (m/mainnet, d/devnet, t/testnet,
+            l/localnet) or a full URL. If a URL is provided, the cluster will be inferred from the URL. If no URL is
+            provided, defaults to mainnet
