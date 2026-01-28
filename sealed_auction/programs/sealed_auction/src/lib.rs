@@ -11,9 +11,11 @@ use errors::*;
 use instructions::*;
 
 
-declare_id!("C84z4ATX6WPa9KVePmKpXHFnJwxu41nLJwvagsefxLkB");
+declare_id!("2rTWXsHTnJdSKxJjdG1wDWdQYFFD3b6RfHbqi3VsR2dt");
 
-pub const ARCIUM_VERIFIER:Pubkey = pubkey!("11111111111111111111111111111111");
+/// Public key for Arcium signature verification
+/// Private key stored in arcium_program/arcium_signer.json
+pub const ARCIUM_VERIFIER:Pubkey = pubkey!("2aFYcBmeSHpautMmmfTXnYjSiGW1brZp9mWw2JeL83jp");
 
 #[program]
 pub mod sealed_auction {

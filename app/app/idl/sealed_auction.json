@@ -1,5 +1,5 @@
 {
-  "address": "C84z4ATX6WPa9KVePmKpXHFnJwxu41nLJwvagsefxLkB",
+  "address": "2rTWXsHTnJdSKxJjdG1wDWdQYFFD3b6RfHbqi3VsR2dt",
   "metadata": {
     "name": "sealed_auction",
     "version": "0.1.0",
@@ -204,11 +204,15 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "_proof",
+          "name": "proof",
           "type": {
             "defined": {
               "name": "ArciumProof"
@@ -420,11 +424,15 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "_winner",
+          "name": "winner",
           "type": "pubkey"
         },
         {
@@ -432,7 +440,7 @@
           "type": "u64"
         },
         {
-          "name": "_proof",
+          "name": "proof",
           "type": {
             "defined": {
               "name": "ArciumProof"
@@ -525,6 +533,11 @@
       "code": 6010,
       "name": "InvalidMinPrice",
       "msg": "Minimum price must be greater than zero"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidSignatureCheck",
+      "msg": "Ed25519 Signature Verification Failed"
     }
   ],
   "types": [

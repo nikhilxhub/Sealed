@@ -1,43 +1,162 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { getProgram } from "@/utils/anchor";
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
+import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
+import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-// Mock Data
-const MOCK_AUCTIONS = [
-    { id: "1", title: "Meridian Bond 004", price: "45.00 SOL", endsIn: "2h 45m", status: "live", priceVal: 45 },
-    { id: "2", title: "Archive Key #882", price: "12.50 SOL", endsIn: "6h 15m", status: "live", priceVal: 12.5 },
-    { id: "3", title: "Stellar Drift Alpha", price: "8.20 SOL", endsIn: "12h 00m", status: "upcoming", priceVal: 8.2 },
-    { id: "4", title: "Obsidian Shard", price: "155.00 SOL", endsIn: "1d 04h", status: "live", priceVal: 155 },
-    { id: "5", title: "Genesis Block", price: "-", endsIn: "Ended", status: "ended", priceVal: 0 },
-];
+// Data Model
+interface AuctionItem {
+    id: string; // PublicKey
+    title: string; // NFT Name
+    price: string; // Min Price string
+    priceVal: number; // For filtering
+    endsIn: string; // Display string
+    endTime: number; // Timestamp
+    status: "live" | "ended" | "settled" | "upcoming";
+    image: string | null;
+}
 
 export default function ExplorePage() {
+    const { connection } = useConnection();
+    const wallet = useAnchorWallet();
+    const { publicKey } = useWallet();
+
+    const [auctions, setAuctions] = useState<AuctionItem[]>([]);
+    const [loading, setLoading] = useState(false);
+
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [priceFilter, setPriceFilter] = useState("all");
     const [timeFilter, setTimeFilter] = useState("all");
 
+    // Fetch Data
+    useEffect(() => {
+        if (!wallet) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const program = getProgram(connection, wallet);
+                const umi = createUmi(connection.rpcEndpoint).use(mplTokenMetadata());
+
+                const allAuctions = await program.account["auction"].all();
+
+                const processed = await Promise.all(allAuctions.map(async (a) => {
+                    const acc = a.account as any;
+                    const now = Date.now() / 1000;
+                    const endTime = acc.endTime.toNumber();
+
+                    let status: AuctionItem["status"] = "live";
+                    if (acc.settled) {
+                        status = "settled";
+                    } else if (now > endTime) {
+                        status = "ended";
+                    }
+
+                    // Calculate "Ends In" string
+                    let endsIn = "";
+                    if (status === "settled") endsIn = "Settled";
+                    else if (status === "ended") endsIn = "Ended";
+                    else {
+                        const diff = endTime - now;
+                        const days = Math.floor(diff / 86400);
+                        const hours = Math.floor((diff % 86400) / 3600);
+                        const minutes = Math.floor((diff % 3600) / 60);
+
+                        if (days > 0) endsIn = `${days}d ${hours}h`;
+                        else if (hours > 0) endsIn = `${hours}h ${minutes}m`;
+                        else endsIn = `${minutes}m`;
+                    }
+
+                    // Metadata
+                    let title = "Unknown Asset";
+                    let image = null;
+                    try {
+                        const mint = new PublicKey(acc.nftMint);
+                        const asset = await fetchDigitalAsset(umi, umiPublicKey(mint.toBase58()));
+                        title = asset.metadata.name;
+                        if (asset.metadata.uri) {
+                            const res = await fetch(asset.metadata.uri);
+                            const json = await res.json();
+                            image = json.image;
+                        }
+                    } catch (e) {
+                        // console.warn("Meta fetch failed", e);
+                    }
+
+                    const minPrice = acc.minPrice.toNumber() / LAMPORTS_PER_SOL;
+
+                    return {
+                        id: a.publicKey.toBase58(),
+                        title,
+                        price: `${minPrice} SOL`,
+                        priceVal: minPrice,
+                        endsIn,
+                        endTime,
+                        status,
+                        image
+                    };
+                }));
+
+                // Sort: Live first, then by earliest deadline? Or newest created?
+                // Default: Live auctions first, closing soonest.
+                processed.sort((a, b) => {
+                    if (a.status === 'live' && b.status !== 'live') return -1;
+                    if (a.status !== 'live' && b.status === 'live') return 1;
+                    return a.endTime - b.endTime;
+                });
+
+                setAuctions(processed);
+            } catch (err) {
+                console.error("Failed to fetch auctions", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [connection, wallet]);
+
     // Filter Logic
     const filteredAuctions = useMemo(() => {
-        return MOCK_AUCTIONS.filter(auction => {
+        return auctions.filter(auction => {
             // Search
             if (searchQuery && !auction.title.toLowerCase().includes(searchQuery.toLowerCase())) {
                 return false;
             }
             // Status
-            if (statusFilter !== "all" && auction.status !== statusFilter) {
-                return false;
+            // statusFilter values: 'all', 'live', 'upcoming', 'ended'
+            if (statusFilter !== "all") {
+                if (statusFilter === 'ended') {
+                    // Include 'settled' in 'ended' filter for UX simplicity
+                    if (auction.status !== 'ended' && auction.status !== 'settled') return false;
+                } else {
+                    if (auction.status !== statusFilter) return false;
+                }
             }
-            // Price (Simple logic for demo)
+
+            // Price
             if (priceFilter === "low" && auction.priceVal > 10) return false;
             if (priceFilter === "high" && auction.priceVal <= 50) return false;
 
+            // Time ('soon' = < 24h)
+            if (timeFilter === "soon") {
+                const now = Date.now() / 1000;
+                const diff = auction.endTime - now;
+                if (diff < 0 || diff > 86400) return false;
+            }
+
             return true;
         });
-    }, [searchQuery, statusFilter, priceFilter]);
+    }, [searchQuery, statusFilter, priceFilter, timeFilter, auctions]);
 
     const handleClearFilters = () => {
         setSearchQuery("");
@@ -100,7 +219,6 @@ export default function ExplorePage() {
                                 options={[
                                     { label: "All Status", value: "all" },
                                     { label: "Live Only", value: "live" },
-                                    { label: "Upcoming", value: "upcoming" },
                                     { label: "Ended", value: "ended" }
                                 ]}
                                 value={statusFilter}
@@ -154,41 +272,63 @@ export default function ExplorePage() {
                 </div>
 
                 {/* Rows or Empty State */}
-                <div className="transition-opacity duration-200">
-                    {filteredAuctions.length > 0 ? (
-                        filteredAuctions.map((auction, i) => (
-                            <Link
-                                key={auction.id}
-                                href={`/auctions/${auction.id}`}
-                                className="group grid grid-cols-12 gap-4 px-4 py-8 border-b border-[#24262D] items-center transition-all duration-300 hover:bg-[#1A1C22]"
-                                style={{ animationDelay: `${i * 50}ms` }}
-                            >
-                                <div className="col-span-6 md:col-span-5 font-display text-2xl text-white group-hover:pl-2 transition-all duration-300">
-                                    {auction.title}
-                                </div>
-                                <div className="col-span-3 text-right font-sans text-[#EDEDED]/80">
-                                    {auction.price}
-                                </div>
-                                <div className="col-span-3 md:col-span-2 text-right font-sans text-[#B5B8C1] tabular-nums">
-                                    {auction.endsIn}
-                                </div>
-                                <div className="col-span-0 md:col-span-2 hidden md:flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <span className="text-xs uppercase tracking-widest border-b border-white text-white">View</span>
-                                </div>
-                            </Link>
-                        ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
-                            <p className="font-sans text-[#B5B8C1] mb-4">No auctions match your filters</p>
-                            <button
-                                onClick={handleClearFilters}
-                                className="text-white hover:underline decoration-1 underline-offset-4 font-medium"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    )}
-                </div>
+                {!publicKey ? (
+                    <div className="py-24 text-center">
+                        <p className="font-sans text-[#B5B8C1] mb-4">Connect wallet to explore live auctions</p>
+                        <WalletMultiButton />
+                    </div>
+                ) : loading ? (
+                    <div className="py-24 text-center text-[#666] font-mono animate-pulse">
+                        Loading live auctions...
+                    </div>
+                ) : (
+                    <div className="transition-opacity duration-200">
+                        {filteredAuctions.length > 0 ? (
+                            filteredAuctions.map((auction, i) => (
+                                <Link
+                                    key={auction.id}
+                                    href={`/auctions/${auction.id}`}
+                                    className="group grid grid-cols-12 gap-4 px-4 py-8 border-b border-[#24262D] items-center transition-all duration-300 hover:bg-[#1A1C22]"
+                                    style={{ animationDelay: `${i * 50}ms` }}
+                                >
+                                    <div className="col-span-6 md:col-span-5 flex items-center gap-4">
+                                        {auction.image ? (
+                                            <img src={auction.image} alt={auction.title} className="w-12 h-12 object-cover rounded-sm border border-[#333]" />
+                                        ) : (
+                                            <div className="w-12 h-12 bg-[#111] rounded-sm border border-[#333]" />
+                                        )}
+                                        <div className="font-display text-xl text-white group-hover:pl-2 transition-all duration-300">
+                                            {auction.title}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-3 text-right font-sans text-[#EDEDED]/80">
+                                        {auction.price}
+                                    </div>
+                                    <div className="col-span-3 md:col-span-2 text-right font-sans">
+                                        {auction.status === 'live' ? (
+                                            <span className="text-[#EDEDED]">{auction.endsIn}</span>
+                                        ) : (
+                                            <span className="text-[#666]">{auction.endsIn}</span>
+                                        )}
+                                    </div>
+                                    <div className="col-span-0 md:col-span-2 hidden md:flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <span className="text-xs uppercase tracking-widest border-b border-white text-white">View</span>
+                                    </div>
+                                </Link>
+                            ))
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
+                                <p className="font-sans text-[#B5B8C1] mb-4">No auctions match your filters</p>
+                                <button
+                                    onClick={handleClearFilters}
+                                    className="text-white hover:underline decoration-1 underline-offset-4 font-medium"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </main>
     );

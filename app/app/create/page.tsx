@@ -185,9 +185,28 @@ export default function CreateAuctionPage() {
             // Optionally redirect or show success
             alert("Auction Created! Tx: " + tx);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating auction:", error);
-            alert("Error creating auction. See console.");
+
+            // Log simulation logs if available
+            if (error.logs) {
+                console.error("Transaction Logs:", error.logs);
+            }
+
+            if (error.simulationResponse) {
+                console.error("Simulation Response:", error.simulationResponse);
+            }
+
+            if ('getLogs' in error && typeof error.getLogs === 'function') {
+                try {
+                    const logs = await error.getLogs(); // getLogs sometimes async depending on version, usually synchronous or returns string[]
+                    console.error("Error Logs (getLogs):", logs);
+                } catch (e) {
+                    console.log("Could not call getLogs()", e);
+                }
+            }
+
+            alert(`Error creating auction. Check console for details. ${error.message ? error.message : ''}`);
         } finally {
             setIsLoading(false);
         }

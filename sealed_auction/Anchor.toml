@@ -1,18 +1,22 @@
 [toolchain]
 package_manager = "yarn"
+anchor_version = "0.32.1"
 
 [features]
 resolution = true
 skip-lint = false
 
+[programs.localnet]
+sealed_auction = "C84z4ATX6WPa9KVePmKpXHFnJwxu41nLJwvagsefxLkB"
+
 [programs.devnet]
 sealed_auction = "C84z4ATX6WPa9KVePmKpXHFnJwxu41nLJwvagsefxLkB"
 
 [registry]
-url = "https://api.devnet.solana.com"
+url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
