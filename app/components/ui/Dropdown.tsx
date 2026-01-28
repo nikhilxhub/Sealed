@@ -39,8 +39,8 @@ export function Dropdown({ options, value, onChange, placeholder = "Select...", 
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={`
-          flex items-center justify-between w-full px-0 py-2
-          bg-transparent border-none
+          flex items-center justify-between w-full px-3 py-2
+          bg-transparent border border-[#24262D] rounded-sm
           text-sm text-left
           focus:outline-none focus:ring-0
           transition-all duration-200

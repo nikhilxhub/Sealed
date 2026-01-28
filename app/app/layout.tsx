@@ -32,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
+        suppressHydrationWarning={true}
         className={`${instrumentSerif.variable} ${poppins.variable} antialiased bg-background text-foreground flex flex-col min-h-screen`}
       >
         <WalletContextProvider>

@@ -4,7 +4,13 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronRight } from "lucide-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import dynamic from 'next/dynamic';
+
+// Dynamically import WalletMultiButton to prevent hydration errors
+const WalletMultiButton = dynamic(
+    () => import('@solana/wallet-adapter-react-ui').then((mod) => mod.WalletMultiButton),
+    { ssr: false }
+);
 
 export function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
