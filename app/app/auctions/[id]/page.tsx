@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { RescueCipher } from "@arcium-hq/client";
+import { Program, Idl } from "@coral-xyz/anchor";
 import { Modal } from "@/components/ui/Modal";
 import { Check, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -13,6 +15,46 @@ import { BN } from "@coral-xyz/anchor";
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
+
+export const ARCIUM_PROGRAM_ID = new PublicKey("BhRakuksFXgaeXAvjFtEVBUw9d2SpUEjt9gScAEAnbXN");
+
+const ARCIUM_IDL: Idl = {
+    version: "0.1.0",
+    name: "arcium_program",
+    instructions: [
+        {
+            name: "submitBid",
+            accounts: [
+                { name: "payer", writable: true, signer: true },
+                { name: "signPdaAccount", writable: true, signer: false },
+                { name: "mxeAccount", writable: false, signer: false },
+                { name: "mempoolAccount", writable: true, signer: false },
+                { name: "executingPool", writable: true, signer: false },
+                { name: "computationAccount", writable: true, signer: false },
+                { name: "compDefAccount", writable: false, signer: false },
+                { name: "clusterAccount", writable: true, signer: false },
+                { name: "poolAccount", writable: true, signer: false },
+                { name: "clockAccount", writable: true, signer: false },
+                { name: "systemProgram", writable: false, signer: false },
+                { name: "arciumProgram", writable: false, signer: false },
+            ],
+            args: [
+                { name: "computationOffset", type: "u64" },
+                { name: "currentMaxBid", type: { array: ["u8", 32] } },
+                { name: "currentWinner0", type: { array: ["u8", 32] } },
+                { name: "currentWinner1", type: { array: ["u8", 32] } },
+                { name: "currentWinner2", type: { array: ["u8", 32] } },
+                { name: "currentWinner3", type: { array: ["u8", 32] } },
+                { name: "newBidAmount", type: { array: ["u8", 32] } },
+                { name: "newBidder0", type: { array: ["u8", 32] } },
+                { name: "newBidder1", type: { array: ["u8", 32] } },
+                { name: "newBidder2", type: { array: ["u8", 32] } },
+                { name: "newBidder3", type: { array: ["u8", 32] } },
+                { name: "minPrice", type: { array: ["u8", 32] } },
+            ],
+        },
+    ],
+};
 
 export default function AuctionDetailPage({ params }: { params: Promise<{ id: string }> }) {
     // Hooks
@@ -30,6 +72,8 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
     const [status, setStatus] = useState<"idle" | "encrypting" | "submitted" | "reveal">("idle");
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    const [maxLockAmount, setMaxLockAmount] = useState("");
+    const [isFocusedMax, setIsFocusedMax] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Data State
@@ -139,7 +183,23 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
     }, [auctionData]);
 
     const handleBid = async () => {
-        if (!bidAmount || !wallet || !auctionData) return;
+        if (!bidAmount || !maxLockAmount || !wallet || !auctionData) return;
+
+        // Validation
+        const bidVal = parseFloat(bidAmount);
+        const lockVal = parseFloat(maxLockAmount);
+        const minPrice = auctionData.minPrice.toNumber() / LAMPORTS_PER_SOL;
+
+        if (bidVal < minPrice) {
+            addToast(`Real Bid must be at least ${minPrice} SOL`, "error");
+            return;
+        }
+
+        if (lockVal < bidVal) {
+            addToast("Max Lock Amount must be equal or greater than Real Bid", "error");
+            return;
+        }
+
         setStatus("encrypting");
 
         try {
@@ -148,10 +208,52 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
 
             const program = getProgram(connection, wallet);
             const auctionPubkey = new PublicKey(id);
-            const amountVal = parseFloat(bidAmount);
+            // Use maxLockAmount for the locking transaction
+            const amountVal = parseFloat(maxLockAmount);
             const amountLamports = new BN(amountVal * LAMPORTS_PER_SOL);
 
+            // --- Arcium Encryption Logic ---
+            console.log("Encrypting bid data with Arcium...");
 
+            // 1. Setup Cipher (Mocking shared secret for demo - in prod use proper key exchange)
+            const mockSharedSecret = new Uint8Array(32).fill(1);
+            // @ts-ignore
+            const cipher = new RescueCipher(mockSharedSecret);
+            const nonce = new Uint8Array(16).fill(0); // Nonce for CTR
+
+            // 2. Encrypt Inputs
+            const bidLamportsBigInt = BigInt(Math.floor(bidVal * LAMPORTS_PER_SOL));
+
+            // Helper to get first 32 bytes (one field element)
+            const encryptToBuffer = (val: bigint): number[] => {
+                const encrypted = cipher.encrypt([val], nonce);
+                return encrypted[0];
+            };
+
+            const encryptedBid = encryptToBuffer(bidLamportsBigInt);
+            const encryptedMinPrice = encryptToBuffer(BigInt(auctionData.minPrice.toNumber()));
+
+            // Mock Encrypted Pubkey (0)
+            const encryptedBidder0 = encryptToBuffer(BigInt(0));
+            const encryptedBidder1 = encryptToBuffer(BigInt(0));
+            const encryptedBidder2 = encryptToBuffer(BigInt(0));
+            const encryptedBidder3 = encryptToBuffer(BigInt(0));
+
+            // Mock Current State (0)
+            const encryptedCurrentMax = encryptToBuffer(BigInt(0));
+            const encryptedCurrentWinner0 = encryptToBuffer(BigInt(0));
+            const encryptedCurrentWinner1 = encryptToBuffer(BigInt(0));
+            const encryptedCurrentWinner2 = encryptToBuffer(BigInt(0));
+            const encryptedCurrentWinner3 = encryptToBuffer(BigInt(0));
+
+            console.log("Encrypted Values Prepared:", {
+                bid: encryptedBid,
+                min: encryptedMinPrice
+            });
+
+            // Note: Arcium submit_bid instruction construction skipped for now 
+            // as we are waiting for IDL typings or raw construction helpers.
+            // In the real implementation, we would add: tx.add(arciumInstruction);
 
             const tx = await program.methods
                 .lockBidFunds(amountLamports)
@@ -316,8 +418,8 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
 
                     ) : status === "idle" || status === "submitted" ? (
                         <>
-                            {/* Mechanical Input */}
-                            <div className="relative group">
+                            {/* Mechanical Input - Real Bid */}
+                            <div className="relative group mb-8">
                                 <label
                                     htmlFor="bid-input"
                                     className={`
@@ -325,7 +427,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                                         ${isFocused || bidAmount ? "text-white" : "text-[#888888]"}
                                     `}
                                 >
-                                    Bid Amount (SOL)
+                                    Real Bid Value (SOL)
                                 </label>
                                 <input
                                     id="bid-input"
@@ -334,6 +436,34 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                                     onChange={(e) => setBidAmount(e.target.value)}
                                     onFocus={() => setIsFocused(true)}
                                     onBlur={() => setIsFocused(false)}
+                                    placeholder={minPriceSOL.toString()}
+                                    min={minPriceSOL}
+                                    step="any"
+                                    className={`
+                                        w-full bg-transparent border-b border-[#333333] py-4 text-3xl md:text-4xl font-mono text-white placeholder-[#333333]
+                                        focus:outline-none focus:border-white transition-colors duration-200 rounded-none caret-white
+                                    `}
+                                />
+                            </div>
+
+                            {/* Mechanical Input - Max Lock Amount */}
+                            <div className="relative group">
+                                <label
+                                    htmlFor="max-lock-input"
+                                    className={`
+                                        font-mono text-[10px] uppercase tracking-widest transition-colors duration-200
+                                        ${isFocusedMax || maxLockAmount ? "text-white" : "text-[#888888]"}
+                                    `}
+                                >
+                                    Max Lock Amount (SOL)
+                                </label>
+                                <input
+                                    id="max-lock-input"
+                                    type="number"
+                                    value={maxLockAmount}
+                                    onChange={(e) => setMaxLockAmount(e.target.value)}
+                                    onFocus={() => setIsFocusedMax(true)}
+                                    onBlur={() => setIsFocusedMax(false)}
                                     placeholder={minPriceSOL.toString()}
                                     min={minPriceSOL}
                                     step="0.1"
@@ -347,7 +477,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                             {/* Mechanical Button */}
                             <button
                                 onClick={handleBid}
-                                disabled={!bidAmount || status === "submitted"}
+                                disabled={!bidAmount || !maxLockAmount || status === "submitted"}
                                 className={`
                                     w-full py-4 px-6 mt-8 font-mono text-sm uppercase tracking-wider transition-all duration-150 border border-transparent
                                     ${status === "submitted"

@@ -10,10 +10,10 @@ skip-lint = false
 arcium_program = "BhRakuksFXgaeXAvjFtEVBUw9d2SpUEjt9gScAEAnbXN"
 
 [registry]
-url = "https://api.apr.dev"
+url = "https://api.devnet.solana.com"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
