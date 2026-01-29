@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 };
 
 import { ToastProvider } from "@/components/ui/Toast";
+import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/layout/Footer";
 import { WalletContextProvider } from "@/components/providers/WalletContextProvider";
 
@@ -42,6 +43,7 @@ export default function RootLayout({
               {children}
             </div>
             <Footer />
+            <Toaster />
           </ToastProvider>
         </WalletContextProvider>
       </body>

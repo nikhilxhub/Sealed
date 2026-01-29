@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
@@ -36,10 +38,12 @@ export default function CreateAuctionPage() {
     const wallet = useAnchorWallet();
     const walletAdapter = useWallet(); // Needed for Umi adapter
     const { publicKey } = useWallet();
+    const router = useRouter();
 
     const [step, setStep] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const isSubmitting = React.useRef(false);
 
     // Data State
     const [userNfts, setUserNfts] = useState<any[]>([]);
@@ -136,6 +140,9 @@ export default function CreateAuctionPage() {
 
     const handleCreateAuction = async () => {
         if (!wallet || !selectedNft) return;
+        if (isSubmitting.current) return; // Prevent double submission
+
+        isSubmitting.current = true;
         setIsLoading(true);
 
         try {
@@ -170,23 +177,41 @@ export default function CreateAuctionPage() {
                 .createAuction(minPriceLamports, endTime)
                 .accounts({
                     seller: wallet.publicKey,
-                    auction: auctionPda,
                     nftMint: nftMint,
                     sellerNftAccount: sellerNftAccount,
                     nftEscrowAccount: nftEscrowKeypair.publicKey,
-                    tokenProgram: TOKEN_PROGRAM_ID,
-                    systemProgram: SystemProgram.programId,
                 })
                 .signers([nftEscrowKeypair]) // Sign with the new keypair for init
                 .rpc();
 
             console.log("Auction Created! Tx:", tx);
             setIsModalOpen(false);
-            // Optionally redirect or show success
-            alert("Auction Created! Tx: " + tx);
+
+            toast.success("Auction Created Successfully!", {
+                description: `Transaction ID: ${tx.slice(0, 8)}...`,
+                duration: 5000,
+            });
+
+            // Redirect to explore page
+            router.push("/explore");
 
         } catch (error: any) {
             console.error("Error creating auction:", error);
+
+            // Check if error is "already processed" (benign race condition)
+            const errorString = error?.message || JSON.stringify(error);
+            const isAlreadyProcessed = errorString.includes("already been processed") ||
+                (error.logs && error.logs.some((l: string) => l.includes("already been processed")));
+
+            if (isAlreadyProcessed) {
+                console.warn("Transaction already processed. Treating as success.");
+                setIsModalOpen(false);
+                toast.success("Auction Created!", {
+                    description: "Transaction was already processed on-chain.",
+                });
+                router.push("/explore");
+                return;
+            }
 
             // Log simulation logs if available
             if (error.logs) {
@@ -206,9 +231,12 @@ export default function CreateAuctionPage() {
                 }
             }
 
-            alert(`Error creating auction. Check console for details. ${error.message ? error.message : ''}`);
+            toast.error("Error creating auction", {
+                description: error.message || "Unknown error occurred",
+            });
         } finally {
             setIsLoading(false);
+            isSubmitting.current = false;
         }
     };
 

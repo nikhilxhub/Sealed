@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -169,11 +169,18 @@ export default function ExplorePage() {
         <main className="min-h-screen px-6 md:px-12 pt-32 md:pt-30 max-w-[1200px] mx-auto animate-fade-in">
             {/* Header with Search & Filter - Redesigned */}
             <div className="flex flex-col gap-8 mb-16">
-                <div className="flex flex-col gap-2">
-                    <h1 className="font-display font-serif text-5xl text-white">Explore Auctions</h1>
-                    <p className="font-sans text-[#B5B8C1] max-w-lg">
-                        Discover and bid on sealed-bid financial instruments.
-                    </p>
+                <div className="flex flex-row items-end justify-between">
+                    <div className="flex flex-col gap-2">
+                        <h1 className="font-display font-serif text-5xl text-white">Explore Auctions</h1>
+                        <p className="font-sans text-[#B5B8C1] max-w-lg">
+                            Discover and bid on sealed-bid financial instruments.
+                        </p>
+                    </div>
+
+                    <Link href="/create" className="font-sans text-base font-medium text-white hover:text-white/80 transition-colors mb-2 pr-1">
+                        create auction  &rarr;
+                        
+                    </Link>
                 </div>
 
                 {/* Unified Control Bar */}

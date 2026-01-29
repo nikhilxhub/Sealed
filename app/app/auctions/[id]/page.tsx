@@ -65,6 +65,24 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                 const auction = await program.account.auction.fetch(auctionPubkey);
                 setAuctionData(auction);
 
+                // 2. Fetch User Bid State
+                if (wallet) {
+                    const [bidEscrowPda] = PublicKey.findProgramAddressSync(
+                        [Buffer.from("bid_escrow"), auctionPubkey.toBuffer(), wallet.publicKey.toBuffer()],
+                        program.programId
+                    );
+                    try {
+                        const bidAccount = await program.account.bidEscrow.fetch(bidEscrowPda);
+                        if (bidAccount) {
+                            setStatus("submitted");
+                            const locked = bidAccount.maxLockedAmount.toNumber() / LAMPORTS_PER_SOL;
+                            setBidAmount(locked.toString());
+                        }
+                    } catch (e) {
+                        // User hasn't bid yet
+                    }
+                }
+
                 // 2. Fetch Metadata
                 const umi = createUmi(connection.rpcEndpoint).use(mplTokenMetadata());
                 try {
@@ -133,19 +151,13 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
             const amountVal = parseFloat(bidAmount);
             const amountLamports = new BN(amountVal * LAMPORTS_PER_SOL);
 
-            // PDA for BidEscrow: [b"bid_escrow", auction, bidder]
-            const [bidEscrow] = PublicKey.findProgramAddressSync(
-                [Buffer.from("bid_escrow"), auctionPubkey.toBuffer(), wallet.publicKey.toBuffer()],
-                program.programId
-            );
+
 
             const tx = await program.methods
                 .lockBidFunds(amountLamports)
                 .accounts({
                     auction: auctionPubkey,
                     bidder: wallet.publicKey,
-                    bidEscrow: bidEscrow,
-                    systemProgram: SystemProgram.programId,
                 })
                 .rpc();
 
@@ -159,6 +171,40 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
             addToast("Failed to place bid", "error");
             setStatus("idle");
         }
+    };
+
+    const handleRefund = async () => {
+        if (!wallet) return;
+        setLoading(true);
+        try {
+            const program = getProgram(connection, wallet);
+            const auctionPubkey = new PublicKey(id);
+
+
+
+            await program.methods
+                .refundLoser()
+                .accounts({
+                    bidder: wallet.publicKey,
+                    auction: auctionPubkey,
+                })
+                .rpc();
+
+            addToast("Refund successful!", "success");
+            setBidAmount("");
+            setStatus("idle");
+            // Optionally refetch data here
+        } catch (err) {
+            console.error("Refund error:", err);
+            addToast("Refund failed", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSettle = async () => {
+        addToast("Settlement requires Arcium proof generation (Pending Integration)", "info");
+        // TODO: Implement Arcium proof generation
     };
 
     if (!wallet) {
@@ -246,12 +292,28 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                     {timeLeft === "Ended" && !auctionData.settled ? (
                         <div className="py-8 text-center border border-[#333] bg-[#111]">
                             <p className="font-mono text-sm text-[#888] uppercase tracking-widest">Auction Ended</p>
-                            <p className="text-xs text-[#555] mt-2">Awaiting Settlement</p>
+                            <p className="text-xs text-[#555] mt-2 mb-4">Awaiting Settlement</p>
+                            <button
+                                onClick={handleSettle}
+                                className="px-6 py-2 border border-[#333] text-[#888] font-mono text-xs uppercase hover:text-white hover:border-white transition-colors"
+                            >
+                                Settle Auction
+                            </button>
                         </div>
                     ) : timeLeft === "Ended" && auctionData.settled ? (
                         <div className="py-8 text-center border border-[#333] bg-[#111]">
                             <p className="font-mono text-sm text-[#888] uppercase tracking-widest">Auction Settled</p>
+                            {/* If user still has a bid amount (meaning bidEscrow exists), they can refund */}
+                            {bidAmount && (
+                                <button
+                                    onClick={handleRefund}
+                                    className="mt-4 px-6 py-2 bg-white text-black font-mono text-xs uppercase hover:bg-gray-200 transition-colors"
+                                >
+                                    Claim Refund
+                                </button>
+                            )}
                         </div>
+
                     ) : status === "idle" || status === "submitted" ? (
                         <>
                             {/* Mechanical Input */}
@@ -343,6 +405,6 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                 </div>
             </Modal>
-        </main>
+        </main >
     );
 }
