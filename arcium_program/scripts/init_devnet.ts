@@ -17,7 +17,7 @@ import fs from "fs";
 import arciumProgramIdl from "../target/idl/arcium_program.json";
 
 async function main() {
-    console.log("🚀 Initializing Arcium Devnet Environment...");
+    console.log("🚀 Initializing Arcium Devnet Environment (Node Offsets Fix)...");
 
     // 1. Setup Provider (Devnet)
     process.env.ANCHOR_PROVIDER_URL = "https://api.devnet.solana.com";
@@ -55,46 +55,33 @@ async function main() {
         const recParams = getCompDefAccOffset("key_recovery_init");
         const recOffset = new anchor.BN(recParams, "le");
 
-        // DYNAMIC FIX: Fetch cluster to get correct SIZE
+        // DYNAMIC FIX: Fetch cluster to get correct SIZE and NODE OFFSETS
         const clusterPda = getClusterAccAddress(CLUSTER_OFFSET);
         const arciumCore = getArciumProgram(provider);
 
         console.log(`   - Fetching Cluster ${CLUSTER_OFFSET} info...`);
         const clusterAcc: any = await arciumCore.account.cluster.fetch(clusterPda);
 
-        // Debug active nodes
-        const activeNodes = clusterAcc.nodes ? clusterAcc.nodes.length : 0;
-        console.log(`   - Active Nodes: ${activeNodes}`);
+        const nodes = clusterAcc.nodes || [];
+        console.log(`   - Active Nodes: ${nodes.length}`);
 
-        // Correct Field is 'clusterSize' (u16)
-        // Access via camelCase usually: clusterSize
-        // Could be snake_case in raw IDL decode: cluster_size
+        // Correctly Map Nodes to their Offsets
+        // InitMxePart2 expects a list of node offsets (u32) to use as recovery peers.
+        // We use all available nodes.
+        const recoveryPeers = nodes.map((node: any) => {
+            // node should be { offset: u32, ... }
+            return node.offset;
+        });
 
-        // Safe access helper
+        console.log(`   - Recovery Peers (Offsets):`, recoveryPeers);
+
+        // Verify count matches cluster size requirement if strict
         const sizeField = clusterAcc.clusterSize || clusterAcc.cluster_size || clusterAcc.size;
+        let requiredSize = 0;
+        if (sizeField && typeof sizeField.toNumber === 'function') requiredSize = sizeField.toNumber();
+        else if (sizeField) requiredSize = Number(sizeField);
 
-        let requiredPeers = 0;
-        if (sizeField) {
-            if (typeof sizeField.toNumber === 'function') {
-                requiredPeers = sizeField.toNumber();
-            } else {
-                requiredPeers = Number(sizeField);
-            }
-        } else {
-            // Fallback
-            console.warn("⚠️ 'clusterSize' property missing, using active node count.");
-            requiredPeers = activeNodes;
-        }
-
-        console.log(`   - Required Recovery Peers (from Cluster Size): ${requiredPeers}`);
-
-        if (Number.isNaN(requiredPeers) || requiredPeers === 0) {
-            requiredPeers = 3; // Hard fallback for typical Devnet cluster? or 2?
-            console.warn(`⚠️ Parsed invalid. Defaulting to ${requiredPeers}.`);
-        }
-
-        // Create recovery peers matching correct size
-        const recoveryPeers = new Array(requiredPeers).fill(0);
+        console.log(`   - Cluster Required Size: ${requiredSize}`);
 
         const sig2 = await initMxePart2(
             provider,
@@ -158,14 +145,13 @@ async function main() {
         }
     }
 
-    const clusterPda = getClusterAccAddress(CLUSTER_OFFSET);
-
     // 5. Output Config
+    const clusterPdaOut = getClusterAccAddress(CLUSTER_OFFSET);
     const config = {
         ARCIUM_PROGRAM_ID: ARCIUM_PROGRAM_ID.toBase58(),
         CLUSTER_OFFSET: CLUSTER_OFFSET,
         MXE_ACCOUNT: mxePda.toBase58(),
-        CLUSTER_ACCOUNT: clusterPda.toBase58(),
+        CLUSTER_ACCOUNT: clusterPdaOut.toBase58(),
     };
 
     console.log("\nDATA FOR FRONTEND:");
