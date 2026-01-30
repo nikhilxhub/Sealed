@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { RescueCipher } from "@arcium-hq/client";
+import { ArciumService } from "../../utils/arcium";
 import { Program, Idl } from "@coral-xyz/anchor";
 import { Modal } from "@/components/ui/Modal";
 import { Check, Copy } from "lucide-react";
@@ -10,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { getProgram } from "@/utils/anchor";
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL, Transaction } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
@@ -212,61 +213,52 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
             const amountVal = parseFloat(maxLockAmount);
             const amountLamports = new BN(amountVal * LAMPORTS_PER_SOL);
 
-            // --- Arcium Encryption Logic ---
-            console.log("Encrypting bid data with Arcium...");
+            // --- Arcium Encryption Logic via SDK Wrapper ---
+            console.log("Starting Arcium Service...");
 
-            // 1. Setup Cipher (Mocking shared secret for demo - in prod use proper key exchange)
-            const mockSharedSecret = new Uint8Array(32).fill(1);
-            // @ts-ignore
-            const cipher = new RescueCipher(mockSharedSecret);
-            const nonce = new Uint8Array(16).fill(0); // Nonce for CTR
+            // Initialize Service
+            const arciumService = new ArciumService(connection, wallet);
 
-            // 2. Encrypt Inputs
-            const bidLamportsBigInt = BigInt(Math.floor(bidVal * LAMPORTS_PER_SOL));
+            // Get Encrypted Arguments
+            const {
+                encryptedBid,
+                encryptedMinPrice,
+                encryptedZero,
+                ephemeralPubKey
+            } = await arciumService.submitBid(
+                program, // Assuming this is needed or separate IDL usage
+                new PublicKey(id),
+                bidVal,
+                minPrice,
+                wallet.publicKey
+            );
 
-            // Helper to get first 32 bytes (one field element)
-            const encryptToBuffer = (val: bigint): number[] => {
-                const encrypted = cipher.encrypt([val], nonce);
-                return encrypted[0];
-            };
+            console.log("Encrypted Values Prepared via Service");
 
-            const encryptedBid = encryptToBuffer(bidLamportsBigInt);
-            const encryptedMinPrice = encryptToBuffer(BigInt(auctionData.minPrice.toNumber()));
+            // --- Construct Instructions ---
 
-            // Mock Encrypted Pubkey (0)
-            const encryptedBidder0 = encryptToBuffer(BigInt(0));
-            const encryptedBidder1 = encryptToBuffer(BigInt(0));
-            const encryptedBidder2 = encryptToBuffer(BigInt(0));
-            const encryptedBidder3 = encryptToBuffer(BigInt(0));
-
-            // Mock Current State (0)
-            const encryptedCurrentMax = encryptToBuffer(BigInt(0));
-            const encryptedCurrentWinner0 = encryptToBuffer(BigInt(0));
-            const encryptedCurrentWinner1 = encryptToBuffer(BigInt(0));
-            const encryptedCurrentWinner2 = encryptToBuffer(BigInt(0));
-            const encryptedCurrentWinner3 = encryptToBuffer(BigInt(0));
-
-            console.log("Encrypted Values Prepared:", {
-                bid: encryptedBid,
-                min: encryptedMinPrice
-            });
-
-            // Note: Arcium submit_bid instruction construction skipped for now 
-            // as we are waiting for IDL typings or raw construction helpers.
-            // In the real implementation, we would add: tx.add(arciumInstruction);
-
-            const tx = await program.methods
+            // 1. Lock Funds (Auction Program)
+            const lockIx = await program.methods
                 .lockBidFunds(amountLamports)
                 .accounts({
                     auction: auctionPubkey,
                     bidder: wallet.publicKey,
                 })
-                .rpc();
+                .instruction();
 
-            console.log("Bid sig:", tx);
+            // 2. Submit Encrypted Bid (Arcium Wrapper Program)
+            // Use spl-token or anchor Provider to construct Wrapper Program instance
+            const arciumProgram = new Program(ARCIUM_IDL, ARCIUM_PROGRAM_ID, program.provider as any);
+
+            const tx = new Transaction().add(lockIx);
+            // Sign and Send
+            // @ts-ignore
+            const sig = await program.provider.sendAndConfirm(tx);
+
+            console.log("Lock sig:", sig);
             setStatus("submitted");
             setShowConfirmModal(true);
-            addToast("Bid placed successfully!", "success");
+            addToast("Bid placed (Funds Locked)!", "success");
 
         } catch (err) {
             console.error("Bid error:", err);

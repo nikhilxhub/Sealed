@@ -17,6 +17,10 @@ import {
 
 async function main() {
     // 1. Setup Provider
+    process.env.ANCHOR_PROVIDER_URL = process.env.ANCHOR_PROVIDER_URL || "https://api.devnet.solana.com";
+    process.env.ANCHOR_WALLET = process.env.ANCHOR_WALLET || os.homedir() + "/.config/solana/id.json";
+    process.env.ARCIUM_CLUSTER_OFFSET = process.env.ARCIUM_CLUSTER_OFFSET || "0";
+
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
     const program = anchor.workspace.ArciumProgram as Program<ArciumProgram>;

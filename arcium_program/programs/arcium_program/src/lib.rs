@@ -3,7 +3,7 @@ use arcium_anchor::prelude::*;
 
 const COMP_DEF_OFFSET_SUBMIT_BID: u32 = comp_def_offset("submit_bid");
 
-declare_id!("BhRakuksFXgaeXAvjFtEVBUw9d2SpUEjt9gScAEAnbXN");
+declare_id!("2excUVgCNGZDN4yHGBbxBg4ptNYTH1nyqnJ5HArAG6wC");
 
 #[arcium_program]
 pub mod arcium_program {
