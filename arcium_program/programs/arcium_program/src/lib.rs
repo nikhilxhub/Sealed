@@ -1,7 +1,14 @@
 use anchor_lang::prelude::*;
 use arcium_anchor::prelude::*;
+use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
+use arcium_macros::circuit_hash;
 
 const COMP_DEF_OFFSET_SUBMIT_BID: u32 = comp_def_offset("submit_bid");
+
+// Circuit URLs - points to compiled .arcis files in the repo
+// After running `arcium build`, upload the build/*.arcis files to GitHub and update these URLs
+const SUBMIT_BID_CIRCUIT_URL: &str = "https://raw.githubusercontent.com/nikhilxhub/Sealed/main/arcium_program/build/submit_bid.arcis";
+const REVEAL_WINNER_CIRCUIT_URL: &str = "https://raw.githubusercontent.com/nikhilxhub/Sealed/main/arcium_program/build/reveal_winner.arcis";
 
 declare_id!("2excUVgCNGZDN4yHGBbxBg4ptNYTH1nyqnJ5HArAG6wC");
 
@@ -10,50 +17,65 @@ pub mod arcium_program {
     use super::*;
 
     pub fn init_submit_bid_comp_def(ctx: Context<InitSubmitBidCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, None, None)?;
+        init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: SUBMIT_BID_CIRCUIT_URL.to_string(),
+                hash: circuit_hash!("submit_bid"),
+            })),
+            None
+        )?;
         Ok(())
     }
 
+    /// Submit a bid with encrypted values
+    ///
+    /// The circuit expects Enc<Shared, BidInputs> which requires:
+    /// 1. x25519 public key (for shared secret derivation)
+    /// 2. nonce (for decryption)
+    /// 3. All encrypted fields matching BidInputs struct order
     pub fn submit_bid(
         ctx: Context<SubmitBid>,
         computation_offset: u64,
+        // Client's ephemeral X25519 public key (32 bytes)
+        encryption_pubkey: [u8; 32],
+        // Encryption nonce (u128)
+        nonce: u128,
+        // Encrypted BidInputs fields (order must match struct)
         current_max_bid: [u8; 32],
-        
-        // Encrypted Pubkey Chunks (Current Winner)
         current_winner_0: [u8; 32],
         current_winner_1: [u8; 32],
         current_winner_2: [u8; 32],
         current_winner_3: [u8; 32],
-        
         new_bid_amount: [u8; 32],
-        
-        // Encrypted Pubkey Chunks (New Bidder)
         new_bidder_0: [u8; 32],
         new_bidder_1: [u8; 32],
         new_bidder_2: [u8; 32],
         new_bidder_3: [u8; 32],
-        
-        min_price: [u8; 32], 
+        min_price: [u8; 32],
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
-        
-        // Order must match BidInputs struct exactly
+
+        // ArgBuilder for Enc<Shared, BidInputs>:
+        // 1. x25519 pubkey for Shared type
+        // 2. plaintext nonce for decryption
+        // 3. encrypted fields in BidInputs order
         let args = ArgBuilder::new()
+            // Shared type requires pubkey + nonce
+            .x25519_pubkey(encryption_pubkey)
+            .plaintext_u128(nonce)
+            // BidInputs fields in order
             .encrypted_u64(current_max_bid)
-            
             .encrypted_u64(current_winner_0)
             .encrypted_u64(current_winner_1)
             .encrypted_u64(current_winner_2)
             .encrypted_u64(current_winner_3)
-            
             .encrypted_u64(new_bid_amount)
-            
             .encrypted_u64(new_bidder_0)
             .encrypted_u64(new_bidder_1)
             .encrypted_u64(new_bidder_2)
             .encrypted_u64(new_bidder_3)
-            
-            .encrypted_u64(min_price) 
+            .encrypted_u64(min_price)
             .build();
 
         queue_computation(
@@ -66,7 +88,7 @@ pub mod arcium_program {
                 &ctx.accounts.mxe_account,
                 &[]
             )?],
-            1, 
+            1,
             0,
         )?;
         Ok(())
@@ -91,13 +113,28 @@ pub mod arcium_program {
     }
 
     pub fn init_reveal_winner_comp_def(ctx: Context<InitRevealWinnerCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, None, None)?;
+        init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: REVEAL_WINNER_CIRCUIT_URL.to_string(),
+                hash: circuit_hash!("reveal_winner"),
+            })),
+            None
+        )?;
         Ok(())
     }
 
+    /// Reveal the winner - decrypts the final auction state
+    ///
+    /// The circuit expects Enc<Shared, AuctionState> and returns plaintext AuctionState
     pub fn reveal_winner(
         ctx: Context<RevealWinner>,
         computation_offset: u64,
+        // Client's ephemeral X25519 public key
+        encryption_pubkey: [u8; 32],
+        // Encryption nonce
+        nonce: u128,
+        // Encrypted AuctionState fields
         max_bid: [u8; 32],
         winner_0: [u8; 32],
         winner_1: [u8; 32],
@@ -105,8 +142,11 @@ pub mod arcium_program {
         winner_3: [u8; 32],
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
-        
+
+        // ArgBuilder for Enc<Shared, AuctionState>
         let args = ArgBuilder::new()
+            .x25519_pubkey(encryption_pubkey)
+            .plaintext_u128(nonce)
             .encrypted_u64(max_bid)
             .encrypted_u64(winner_0)
             .encrypted_u64(winner_1)

@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection, Keypair } from "@solana/web3.js";
 import { ArciumProgram } from "../target/types/arcium_program";
 import * as fs from "fs";
 import * as os from "os";
@@ -16,12 +16,22 @@ import {
 } from "@arcium-hq/client";
 
 async function main() {
-    // 1. Setup Provider
-    process.env.ANCHOR_PROVIDER_URL = process.env.ANCHOR_PROVIDER_URL || "https://api.devnet.solana.com";
-    process.env.ANCHOR_WALLET = process.env.ANCHOR_WALLET || os.homedir() + "/.config/solana/id.json";
-    process.env.ARCIUM_CLUSTER_OFFSET = process.env.ARCIUM_CLUSTER_OFFSET || "0";
+    // 1. Setup Provider - Set env vars BEFORE calling AnchorProvider.env()
+    const rpcUrl = process.env.ANCHOR_PROVIDER_URL || "https://api.devnet.solana.com";
+    const walletPath = process.env.ANCHOR_WALLET || os.homedir() + "/.config/solana/id.json";
 
-    const provider = anchor.AnchorProvider.env();
+    // Set environment variables for Arcium client
+    process.env.ANCHOR_PROVIDER_URL = rpcUrl;
+    process.env.ANCHOR_WALLET = walletPath;
+    process.env.ARCIUM_CLUSTER_OFFSET = process.env.ARCIUM_CLUSTER_OFFSET || "456"; // Devnet cluster offset
+
+    // Create provider manually to avoid AnchorProvider.env() issues
+    const connection = new Connection(rpcUrl, "confirmed");
+    const walletKeypair = Keypair.fromSecretKey(
+        new Uint8Array(JSON.parse(fs.readFileSync(walletPath, "utf-8")))
+    );
+    const wallet = new anchor.Wallet(walletKeypair);
+    const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
     anchor.setProvider(provider);
     const program = anchor.workspace.ArciumProgram as Program<ArciumProgram>;
     const wallet = provider.wallet as anchor.Wallet;
