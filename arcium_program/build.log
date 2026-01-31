@@ -1,0 +1,27 @@
+WARNING: `@coral-xyz/anchor` version(^0.31.1) and the current CLI version(0.32.1) don't match.
+
+	This can lead to unwanted behavior. To fix, upgrade the package by running:
+
+	yarn upgrade @coral-xyz/anchor@0.32.1
+
+Error: Function _ZN109_$LT$arcium_client..idl..arcium..utils..Account$u20$as$u20$core..convert..TryFrom$LT$$RF$$u5b$u8$u5d$$GT$$GT$8try_from17ha037aaf1519dcf38E Stack offset of 721512 exceeded max offset of 4096 by 717416 bytes, please minimize large stack variables. Estimated function frame size: 721536 bytes. Exceeding the maximum stack offset may cause undefined behavior during execution.
+
+   Compiling arcium_program v0.1.0 (/mnt/d/web3projects/Sealed/arcium_program/programs/arcium_program)
+error[E0560]: struct `arcium_client::idl::arcium::types::CallbackAccount` has no field named `is_signer`
+   --> programs/arcium_program/src/lib.rs:129:25
+    |
+129 |                         is_signer: false,
+    |                         ^^^^^^^^^ `arcium_client::idl::arcium::types::CallbackAccount` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+error[E0560]: struct `arcium_client::idl::arcium::types::CallbackAccount` has no field named `is_signer`
+   --> programs/arcium_program/src/lib.rs:210:25
+    |
+210 |                         is_signer: false,
+    |                         ^^^^^^^^^ `arcium_client::idl::arcium::types::CallbackAccount` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+For more information about this error, try `rustc --explain E0560`.
+error: could not compile `arcium_program` (lib) due to 2 previous errors

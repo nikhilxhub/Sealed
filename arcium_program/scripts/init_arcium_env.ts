@@ -34,7 +34,7 @@ async function main() {
     const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
     anchor.setProvider(provider);
     const program = anchor.workspace.ArciumProgram as Program<ArciumProgram>;
-    const wallet = provider.wallet as anchor.Wallet;
+
 
     console.log("Initializing Arcium Runtime for Sealed Auction...");
 
