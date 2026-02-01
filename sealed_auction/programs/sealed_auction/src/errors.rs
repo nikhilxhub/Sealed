@@ -11,15 +11,21 @@ pub enum AuctionError {
     #[msg("Auction already settled")]
     AlreadySettled,
 
-    #[msg("Invalid Arcium proof")]
-    InvalidArciumProof,
+    #[msg("Invalid auction result account")]
+    InvalidAuctionResult,
+
+    #[msg("Auction result not revealed yet")]
+    ResultNotRevealed,
+
+    #[msg("Auction ID mismatch")]
+    AuctionMismatch,
 
     #[msg("Bid below minimum price")]
     BelowMinPrice,
 
     #[msg("Insufficient escrow")]
     InsufficientEscrow,
-    
+
     #[msg("Funds already withdrawn")]
     AlreadyWithdrawn,
 
@@ -35,6 +41,6 @@ pub enum AuctionError {
     #[msg("Minimum price must be greater than zero")]
     InvalidMinPrice,
 
-    #[msg("Ed25519 Signature Verification Failed")]
-    InvalidSignatureCheck,
+    #[msg("No valid winner exists")]
+    NoValidWinner,
 }

@@ -20,6 +20,15 @@ pub struct SettleAuction<'info> {
     )]
     pub auction: Account<'info, Auction>,
 
+    /// The auction result from arcium_program (cross-program account verification)
+    /// Constraint: must be owned by ARCIUM_PROGRAM_ID
+    #[account(
+        seeds = [AUCTION_RESULT_SEED, auction.key().as_ref()],
+        bump = auction_result.bump,
+        seeds::program = ARCIUM_PROGRAM_ID,
+    )]
+    pub auction_result: Account<'info, AuctionResult>,
+
     #[account(
         mut,
         seeds = [b"bid_escrow", auction.key().as_ref(), winner.key().as_ref()],
@@ -48,10 +57,6 @@ pub struct SettleAuction<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    
-    /// CHECK: We inspect this sysvar to verify the Ed25519 signature instruction
-    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
-    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> SettleAuction<'info> {

@@ -12,8 +12,19 @@ const REVEAL_WINNER_CIRCUIT_URL: &str = "https://raw.githubusercontent.com/nikhi
 
 // Seeds for PDAs
 const AUCTION_STATE_SEED: &[u8] = b"auction_bid_state";
+const AUCTION_RESULT_SEED: &[u8] = b"auction_result";
 
 declare_id!("2excUVgCNGZDN4yHGBbxBg4ptNYTH1nyqnJ5HArAG6wC");
+
+/// Helper: Reconstruct a Pubkey from 4 u64 chunks (little-endian)
+fn reconstruct_pubkey(chunk0: u64, chunk1: u64, chunk2: u64, chunk3: u64) -> Pubkey {
+    let mut bytes = [0u8; 32];
+    bytes[0..8].copy_from_slice(&chunk0.to_le_bytes());
+    bytes[8..16].copy_from_slice(&chunk1.to_le_bytes());
+    bytes[16..24].copy_from_slice(&chunk2.to_le_bytes());
+    bytes[24..32].copy_from_slice(&chunk3.to_le_bytes());
+    Pubkey::new_from_array(bytes)
+}
 
 #[arcium_program]
 pub mod arcium_program {
@@ -55,7 +66,6 @@ pub mod arcium_program {
         state.auction_id = _auction_id;
         state.bump = ctx.bumps.auction_bid_state;
         state.bid_count = 0;
-        // Initialize with zeros - first bid will set the initial values
         state.encrypted_max_bid = [0u8; 32];
         state.encrypted_winner_0 = [0u8; 32];
         state.encrypted_winner_1 = [0u8; 32];
@@ -66,25 +76,16 @@ pub mod arcium_program {
     }
 
     /// Submit a bid with encrypted values
-    ///
-    /// For the FIRST bid: current state values should be encrypted zeros
-    /// For subsequent bids: frontend reads current state from auction_bid_state account
     pub fn submit_bid(
         ctx: Context<SubmitBid>,
         computation_offset: u64,
-        // Client's ephemeral X25519 public key (32 bytes)
         encryption_pubkey: [u8; 32],
-        // Encryption nonce (u128)
         nonce: u128,
-        // Encrypted BidInputs fields (order must match circuit struct)
-        // For first bid: these should be encrypted zeros
-        // For subsequent bids: read from auction_bid_state account
         current_max_bid: [u8; 32],
         current_winner_0: [u8; 32],
         current_winner_1: [u8; 32],
         current_winner_2: [u8; 32],
         current_winner_3: [u8; 32],
-        // New bid data (always from the current bidder)
         new_bid_amount: [u8; 32],
         new_bidder_0: [u8; 32],
         new_bidder_1: [u8; 32],
@@ -94,10 +95,6 @@ pub mod arcium_program {
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
-        // ArgBuilder for Enc<Shared, BidInputs>:
-        // 1. x25519 pubkey for Shared type owner
-        // 2. plaintext nonce for decryption
-        // 3. encrypted fields in BidInputs struct order
         let args = ArgBuilder::new()
             .x25519_pubkey(encryption_pubkey)
             .plaintext_u128(nonce)
@@ -114,7 +111,6 @@ pub mod arcium_program {
             .encrypted_u64(min_price)
             .build();
 
-        // Include auction_bid_state in callback so we can update it
         queue_computation(
             ctx.accounts,
             computation_offset,
@@ -147,7 +143,6 @@ pub mod arcium_program {
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
-        // Update the auction state with new encrypted values
         let state = &mut ctx.accounts.auction_bid_state;
         state.encrypted_max_bid = o.ciphertexts[0];
         state.encrypted_winner_0 = o.ciphertexts[1];
@@ -157,7 +152,6 @@ pub mod arcium_program {
         state.nonce = o.nonce;
         state.bid_count += 1;
 
-        // Emit event for indexers/frontends
         emit!(AuctionUpdatedEvent {
             auction_id: state.auction_id,
             new_max_bid: o.ciphertexts[0],
@@ -172,7 +166,7 @@ pub mod arcium_program {
     }
 
     /// Reveal the winner - decrypts the final auction state
-    /// Call this after auction ends to get plaintext winner info
+    /// Call this after auction ends to get plaintext winner info and enable settlement
     pub fn reveal_winner(
         ctx: Context<RevealWinner>,
         computation_offset: u64,
@@ -181,10 +175,17 @@ pub mod arcium_program {
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
-        // Read encrypted state from auction_bid_state account
+        // Initialize auction_result account
+        let result = &mut ctx.accounts.auction_result;
+        result.auction_id = ctx.accounts.auction_bid_state.auction_id;
+        result.bump = ctx.bumps.auction_result;
+        result.revealed = false;
+        result.winner = Pubkey::default();
+        result.winning_amount = 0;
+        result.revealed_at = 0;
+
         let state = &ctx.accounts.auction_bid_state;
 
-        // ArgBuilder for Enc<Shared, AuctionState>
         let args = ArgBuilder::new()
             .x25519_pubkey(encryption_pubkey)
             .plaintext_u128(nonce)
@@ -208,6 +209,10 @@ pub mod arcium_program {
                         pubkey: ctx.accounts.auction_bid_state.key(),
                         is_writable: false,
                     },
+                    CallbackAccount {
+                        pubkey: ctx.accounts.auction_result.key(),
+                        is_writable: true,
+                    },
                 ]
             )?],
             1,
@@ -216,7 +221,7 @@ pub mod arcium_program {
         Ok(())
     }
 
-    /// Callback from reveal computation - emits plaintext winner info
+    /// Callback from reveal computation - stores plaintext winner info for settlement
     #[arcium_callback(encrypted_ix = "reveal_winner")]
     pub fn reveal_winner_callback(
         ctx: Context<RevealWinnerCallback>,
@@ -227,15 +232,23 @@ pub mod arcium_program {
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
-        // Emit plaintext winner info
+        // Reconstruct winner pubkey from u64 chunks
+        let winner = reconstruct_pubkey(o.field_1, o.field_2, o.field_3, o.field_4);
+
+        // Store plaintext result for settlement
+        let result = &mut ctx.accounts.auction_result;
+        result.winner = winner;
+        result.winning_amount = o.field_0;
+        result.revealed_at = Clock::get()?.unix_timestamp;
+        result.revealed = true;
+
+        // Emit event for indexers
         emit!(AuctionResultEvent {
             auction_id: ctx.accounts.auction_bid_state.auction_id,
             winning_bid: o.field_0,
-            winner_0: o.field_1,
-            winner_1: o.field_2,
-            winner_2: o.field_3,
-            winner_3: o.field_4,
+            winner,
         });
+
         Ok(())
     }
 }
@@ -245,25 +258,37 @@ pub mod arcium_program {
 // ============================================================================
 
 /// Stores encrypted auction state between bids
-/// One account per auction, derived from auction_id
 #[account]
 #[derive(InitSpace)]
 pub struct AuctionBidState {
-    /// The auction this state belongs to (from sealed_auction program)
     pub auction_id: Pubkey,
-    /// PDA bump
     pub bump: u8,
-    /// Number of bids processed
     pub bid_count: u64,
-    /// Encrypted current max bid
     pub encrypted_max_bid: [u8; 32],
-    /// Encrypted winner pubkey chunks (4 x u64)
     pub encrypted_winner_0: [u8; 32],
     pub encrypted_winner_1: [u8; 32],
     pub encrypted_winner_2: [u8; 32],
     pub encrypted_winner_3: [u8; 32],
-    /// Nonce for the current encrypted state
     pub nonce: u128,
+}
+
+/// Stores the PLAINTEXT auction result after reveal
+/// This is what sealed_auction reads to verify the winner
+#[account]
+#[derive(InitSpace)]
+pub struct AuctionResult {
+    /// The auction this result belongs to
+    pub auction_id: Pubkey,
+    /// PDA bump
+    pub bump: u8,
+    /// Whether the result has been revealed
+    pub revealed: bool,
+    /// The winner's pubkey (plaintext)
+    pub winner: Pubkey,
+    /// The winning bid amount in lamports (plaintext)
+    pub winning_amount: u64,
+    /// Timestamp when revealed
+    pub revealed_at: i64,
 }
 
 // ============================================================================
@@ -309,15 +334,15 @@ pub struct SubmitBid<'info> {
     pub mxe_account: Account<'info, MXEAccount>,
 
     #[account(mut, address = derive_mempool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: mempool_account, checked by arcium program
+    /// CHECK: mempool_account
     pub mempool_account: UncheckedAccount<'info>,
 
     #[account(mut, address = derive_execpool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: executing_pool, checked by arcium program
+    /// CHECK: executing_pool
     pub executing_pool: UncheckedAccount<'info>,
 
     #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: computation_account, checked by arcium program
+    /// CHECK: computation_account
     pub computation_account: UncheckedAccount<'info>,
 
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_SUBMIT_BID))]
@@ -332,7 +357,6 @@ pub struct SubmitBid<'info> {
     #[account(mut, address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
     pub clock_account: Account<'info, ClockAccount>,
 
-    /// The auction's encrypted state account
     #[account(mut)]
     pub auction_bid_state: Account<'info, AuctionBidState>,
 
@@ -351,7 +375,7 @@ pub struct SubmitBidCallback<'info> {
     #[account(address = derive_mxe_pda!())]
     pub mxe_account: Account<'info, MXEAccount>,
 
-    /// CHECK: computation_account, checked by arcium program
+    /// CHECK: computation_account
     pub computation_account: UncheckedAccount<'info>,
 
     #[account(address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet))]
@@ -361,7 +385,6 @@ pub struct SubmitBidCallback<'info> {
     /// CHECK: instructions_sysvar
     pub instructions_sysvar: AccountInfo<'info>,
 
-    /// The auction state to update (from CallbackAccount)
     #[account(mut)]
     pub auction_bid_state: Account<'info, AuctionBidState>,
 }
@@ -387,15 +410,15 @@ pub struct RevealWinner<'info> {
     pub mxe_account: Account<'info, MXEAccount>,
 
     #[account(mut, address = derive_mempool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: mempool_account, checked by arcium program
+    /// CHECK: mempool_account
     pub mempool_account: UncheckedAccount<'info>,
 
     #[account(mut, address = derive_execpool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: executing_pool, checked by arcium program
+    /// CHECK: executing_pool
     pub executing_pool: UncheckedAccount<'info>,
 
     #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: computation_account, checked by arcium program
+    /// CHECK: computation_account
     pub computation_account: UncheckedAccount<'info>,
 
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_REVEAL_WINNER))]
@@ -413,6 +436,16 @@ pub struct RevealWinner<'info> {
     /// The auction's encrypted state account
     pub auction_bid_state: Account<'info, AuctionBidState>,
 
+    /// The auction result account (created here, written in callback)
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + AuctionResult::INIT_SPACE,
+        seeds = [AUCTION_RESULT_SEED, auction_bid_state.auction_id.as_ref()],
+        bump,
+    )]
+    pub auction_result: Account<'info, AuctionResult>,
+
     pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
 }
@@ -428,7 +461,7 @@ pub struct RevealWinnerCallback<'info> {
     #[account(address = derive_mxe_pda!())]
     pub mxe_account: Account<'info, MXEAccount>,
 
-    /// CHECK: computation_account, checked by arcium program
+    /// CHECK: computation_account
     pub computation_account: UncheckedAccount<'info>,
 
     #[account(address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet))]
@@ -438,8 +471,12 @@ pub struct RevealWinnerCallback<'info> {
     /// CHECK: instructions_sysvar
     pub instructions_sysvar: AccountInfo<'info>,
 
-    /// The auction state (read-only in callback)
+    /// The auction bid state (read-only)
     pub auction_bid_state: Account<'info, AuctionBidState>,
+
+    /// The auction result account (writable - stores plaintext result)
+    #[account(mut)]
+    pub auction_result: Account<'info, AuctionResult>,
 }
 
 #[init_computation_definition_accounts("submit_bid", payer)]
@@ -452,7 +489,7 @@ pub struct InitSubmitBidCompDef<'info> {
     pub mxe_account: Box<Account<'info, MXEAccount>>,
 
     #[account(mut)]
-    /// CHECK: comp_def_account, checked by arcium program
+    /// CHECK: comp_def_account
     pub comp_def_account: UncheckedAccount<'info>,
 
     pub arcium_program: Program<'info, Arcium>,
@@ -469,7 +506,7 @@ pub struct InitRevealWinnerCompDef<'info> {
     pub mxe_account: Box<Account<'info, MXEAccount>>,
 
     #[account(mut)]
-    /// CHECK: comp_def_account, checked by arcium program
+    /// CHECK: comp_def_account
     pub comp_def_account: UncheckedAccount<'info>,
 
     pub arcium_program: Program<'info, Arcium>,
@@ -482,32 +519,21 @@ pub struct InitRevealWinnerCompDef<'info> {
 
 #[event]
 pub struct AuctionUpdatedEvent {
-    /// The auction this update belongs to
     pub auction_id: Pubkey,
-    /// Encrypted max bid
     pub new_max_bid: [u8; 32],
-    /// Encrypted winner pubkey chunks
     pub new_winner_0: [u8; 32],
     pub new_winner_1: [u8; 32],
     pub new_winner_2: [u8; 32],
     pub new_winner_3: [u8; 32],
-    /// Encryption nonce
     pub nonce: u128,
-    /// Total bids processed for this auction
     pub bid_count: u64,
 }
 
 #[event]
 pub struct AuctionResultEvent {
-    /// The auction this result belongs to
     pub auction_id: Pubkey,
-    /// Revealed winning bid amount (in lamports)
     pub winning_bid: u64,
-    /// Revealed winner pubkey chunks (reassemble: winner_0 | winner_1 | winner_2 | winner_3)
-    pub winner_0: u64,
-    pub winner_1: u64,
-    pub winner_2: u64,
-    pub winner_3: u64,
+    pub winner: Pubkey,
 }
 
 // ============================================================================

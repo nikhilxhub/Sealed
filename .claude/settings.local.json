@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(dir:*)",
+      "Bash(dir \"%APPDATA%\\\\solana\\\\id.json\")",
+      "Bash(dir \"%LOCALAPPDATA%\\\\solana\\\\id.json\")",
+      "Bash(wsl -e bash -c \"cd /mnt/d/web3projects/Sealed/arcium_program && npx ts-node scripts/check_mxe.ts 2>&1\")",
+      "Bash(wsl -e bash -c:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}

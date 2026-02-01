@@ -16,7 +16,7 @@ async function main() {
 
     // Your Program ID
     const mxeProgramId = new anchor.web3.PublicKey("2excUVgCNGZDN4yHGBbxBg4ptNYTH1nyqnJ5HArAG6wC");
-    const clusterOffset = 0; // Devnet default
+    const clusterOffset = 456; // Devnet cluster offset (from Arcium.toml)
 
     console.log("Initializing MXE Part 1...");
     try {

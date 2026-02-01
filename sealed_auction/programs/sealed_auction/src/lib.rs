@@ -13,10 +13,6 @@ use instructions::*;
 
 declare_id!("2rTWXsHTnJdSKxJjdG1wDWdQYFFD3b6RfHbqi3VsR2dt");
 
-/// Public key for Arcium signature verification
-/// Private key stored in arcium_program/arcium_signer.json
-pub const ARCIUM_VERIFIER:Pubkey = pubkey!("2aFYcBmeSHpautMmmfTXnYjSiGW1brZp9mWw2JeL83jp");
-
 #[program]
 pub mod sealed_auction {
     use super::*;
@@ -80,31 +76,43 @@ pub mod sealed_auction {
         Ok(())
     }
 
-    pub fn settle_auction(
-        ctx: Context<SettleAuction>,
-        winner: Pubkey,
-        winning_amount: u64,
-        proof: ArciumProof,
-    ) -> Result<()> {
+    /// Settle the auction using the verified result from arcium_program
+    /// The auction_result account is created by arcium_program after reveal_winner
+    /// and contains the plaintext winner/winning_amount verified by MPC
+    pub fn settle_auction(ctx: Context<SettleAuction>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
         require!(now > ctx.accounts.auction.end_time, AuctionError::AuctionNotEnded);
         require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
 
-        // --- Verify Arcium Attestation ---
-        // Construct the message: winner_pubkey (32) + winning_amount (8)
-        let mut message = Vec::with_capacity(40);
-        message.extend_from_slice(winner.as_ref());
-        message.extend_from_slice(&winning_amount.to_le_bytes());
+        // --- Verify Cross-Program Account ---
+        let auction_result = &ctx.accounts.auction_result;
 
-        // Verify that Arcium signed this specific message
-        verify_ed25519_ix(
-            &ctx.accounts.sysvar_instructions,
-            &ARCIUM_VERIFIER,
-            &message,
-            &proof.signature,
-        )?;
-        
+        // 1. Verify the account is owned by arcium_program (enforced by seeds::program constraint)
+        require!(
+            auction_result.to_account_info().owner == &ARCIUM_PROGRAM_ID,
+            AuctionError::InvalidAuctionResult
+        );
+
+        // 2. Verify the result has been revealed
+        require!(auction_result.revealed, AuctionError::ResultNotRevealed);
+
+        // 3. Verify the auction ID matches
+        require!(
+            auction_result.auction_id == ctx.accounts.auction.key(),
+            AuctionError::AuctionMismatch
+        );
+
+        // Read verified winner/amount from arcium_program's AuctionResult
+        let winner = auction_result.winner;
+        let winning_amount = auction_result.winning_amount;
+
+        // 4. Verify winner matches the provided winner account
+        require!(
+            winner == ctx.accounts.winner.key(),
+            AuctionError::AuctionMismatch
+        );
+
         // --- Financial Safety ---
         require!(winning_amount >= ctx.accounts.auction.min_price, AuctionError::BelowMinPrice);
         require!(
@@ -117,7 +125,7 @@ pub mod sealed_auction {
         // Uses system_program::transfer with PDA signer
         let auction_key = ctx.accounts.auction.key();
         let winner_key = ctx.accounts.winner.key();
-        
+
         let seeds = &[
             b"bid_escrow",
             auction_key.as_ref(),
@@ -140,7 +148,7 @@ pub mod sealed_auction {
 
         // 2. Refund Excess to Winner
         // Handled automatically by Anchor's `close = winner` constraint.
-        // Any remaining lamports in winner_bid_escrow (max_locked - winning_amount) 
+        // Any remaining lamports in winner_bid_escrow (max_locked - winning_amount)
         // will be sent to the winner when the account closes at end of instruction.
 
         // NFT → winner
@@ -148,7 +156,7 @@ pub mod sealed_auction {
             ctx.accounts.into_transfer_to_winner(),
             1,
         )?;
-        
+
         // Mark settled
         ctx.accounts.winner_bid_escrow.withdrawn = true;
         ctx.accounts.auction.settled = true;
@@ -197,29 +205,36 @@ pub mod sealed_auction {
 
     /// Finalize auction when Arcium determines no valid winner exists
     /// (all bids < min_price or no bids). Permissionless - anyone can crank.
-    pub fn finalize_no_winner(
-        ctx: Context<FinalizeNoWinner>,
-        proof: ArciumProof,
-    ) -> Result<()> {
+    /// The auction_result account must show winner = Pubkey::default() (all zeros)
+    pub fn finalize_no_winner(ctx: Context<FinalizeNoWinner>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
         require!(now > ctx.accounts.auction.end_time, AuctionError::AuctionNotEnded);
         require!(!ctx.accounts.auction.settled, AuctionError::AlreadySettled);
 
-        // --- Verify Arcium Attestation ---
-        // For "No Winner", we expect Arcium to sign a specific NULL state.
-        // Message: 0u64 (winner, though it's pubkey bytes) + 0u64 (amount)
-        // Pubkey::default() is 32 bytes of zeros.
-        let mut message = Vec::with_capacity(40);
-        message.extend_from_slice(&[0u8; 32]); // Null Pubkey
-        message.extend_from_slice(&0u64.to_le_bytes()); // Zero Amount
+        // --- Verify Cross-Program Account ---
+        let auction_result = &ctx.accounts.auction_result;
 
-        verify_ed25519_ix(
-            &ctx.accounts.sysvar_instructions,
-            &ARCIUM_VERIFIER,
-            &message,
-            &proof.signature,
-        )?;
+        // 1. Verify the account is owned by arcium_program (enforced by seeds::program constraint)
+        require!(
+            auction_result.to_account_info().owner == &ARCIUM_PROGRAM_ID,
+            AuctionError::InvalidAuctionResult
+        );
+
+        // 2. Verify the result has been revealed
+        require!(auction_result.revealed, AuctionError::ResultNotRevealed);
+
+        // 3. Verify the auction ID matches
+        require!(
+            auction_result.auction_id == ctx.accounts.auction.key(),
+            AuctionError::AuctionMismatch
+        );
+
+        // 4. Verify no valid winner (winner is Pubkey::default() and amount is 0)
+        require!(
+            auction_result.winner == Pubkey::default() && auction_result.winning_amount == 0,
+            AuctionError::NoValidWinner
+        );
 
         // Transfer NFT back to seller
         let seeds = &[
@@ -240,65 +255,44 @@ pub mod sealed_auction {
         Ok(())
     }
 
-    
+    /// Reclaim NFT when auction ends with ZERO bids.
+    /// This is needed because:
+    /// - cancel_auction requires auction NOT ended
+    /// - finalize_no_winner requires AuctionResult (which requires bids to exist)
+    /// Only the seller can call this.
+    pub fn reclaim_unsold(ctx: Context<ReclaimUnsold>) -> Result<()> {
+        let auction = &ctx.accounts.auction;
+        let now = Clock::get()?.unix_timestamp;
 
-}
+        // Safety checks
+        require!(now > auction.end_time, AuctionError::AuctionNotEnded);
+        require!(auction.bid_count == 0, AuctionError::BidsAlreadyPlaced);
+        require!(!auction.settled, AuctionError::AlreadySettled);
 
+        // Transfer NFT back to seller
+        let seeds = &[
+            b"auction".as_ref(),
+            auction.nft_mint.as_ref(),
+            &[auction.bump],
+        ];
+        let signer = &[&seeds[..]];
 
+        token::transfer(
+            ctx.accounts.into_transfer_back_to_seller().with_signer(signer),
+            1,
+        )?;
 
-// --- Helper: Ed25519 Verification ---
+        // Account is closed by Anchor's `close = seller` constraint
+        // Rent is returned to seller
 
-use anchor_lang::solana_program::sysvar::instructions::{
-    load_instruction_at_checked, check_id as check_ix_sysvar_id
-};
-
-// Ed25519 Program ID is "Ed25519SigVerify111111111111111111111111111"
-pub const ED25519_ID: Pubkey = pubkey!("Ed25519SigVerify111111111111111111111111111");
-
-pub fn verify_ed25519_ix(
-    instructions_account: &AccountInfo,
-    expected_signer: &Pubkey,
-    expected_message: &[u8],
-    expected_signature: &[u8],
-) -> Result<()> {
-    // 1. Verify sysvar ID
-    if !check_ix_sysvar_id(&instructions_account.key()) {
-        return Err(ErrorCode::InstructionMissing.into()); // Use generic error or create new one
+        Ok(())
     }
 
-    // 2. Iterate through prior instructions to find Ed25519
-    // SIMPLIFICATION for V1:
-    // We assume the caller places Ed25519 verify as the instruction at index 0 
-    // and this instruction is index 1 (or similar).
-    
-    // Check PREVIOUS instruction (index - 1)
-    let current_index = anchor_lang::solana_program::sysvar::instructions::load_current_index_checked(instructions_account)?;
-    if current_index == 0 {
-        return Err(AuctionError::InvalidSignatureCheck.into());
-    }
-    
-    let prev_index = current_index - 1;
-    let ix = load_instruction_at_checked(prev_index as usize, instructions_account)
-        .map_err(|_| AuctionError::InvalidSignatureCheck)?;
-
-    // Check Program ID
-    if ix.program_id != ED25519_ID {
-        return Err(AuctionError::InvalidSignatureCheck.into());
-    }
-    
-    // Check Content
-    // This ensures specific checking of OUR params
-    let data = &ix.data;
-    
-    // Naive containment check:
-    // Ensure the data byte array has the Pubkey bytes, Signature bytes, and Message bytes
-    let pk_found = data.windows(32).any(|window| window == expected_signer.as_ref());
-    let sig_found = data.windows(64).any(|window| window == expected_signature);
-    let msg_found = data.windows(expected_message.len()).any(|window| window == expected_message);
-
-    if !pk_found || !sig_found || !msg_found {
-         return Err(AuctionError::InvalidSignatureCheck.into());
+    /// Close a settled auction account to reclaim rent.
+    /// Use this to clean up old settled auctions that weren't closed properly.
+    pub fn close_settled(_ctx: Context<CloseSettled>) -> Result<()> {
+        // Account is closed automatically by the `close = seller` constraint
+        Ok(())
     }
 
-    Ok(())
 }

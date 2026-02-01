@@ -21,7 +21,10 @@ async function main() {
 
     // 1. Setup Provider (Devnet)
     process.env.ANCHOR_PROVIDER_URL = "https://api.devnet.solana.com";
-    process.env.ANCHOR_WALLET = path.join(os.homedir(), ".config", "solana", "id.json");
+    // Use id.json wallet from project directory (copied from WSL ~/.config/solana/id.json)
+    const walletPath = path.join(__dirname, "..", "id.json");
+    process.env.ANCHOR_WALLET = walletPath;
+    console.log("Using wallet:", walletPath);
 
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
@@ -41,10 +44,14 @@ async function main() {
         const sig1 = await initMxePart1(provider, ARCIUM_PROGRAM_ID);
         console.log("   - MXE Part 1 tx:", sig1);
     } catch (e: any) {
-        if (JSON.stringify(e).includes("0x0") || e.toString().includes("already in use")) {
-            console.log("   - MXE Part 1: Already initialized (or conflict).");
-        } else {
-            console.log("   - MXE Part 1 status:", e.message);
+        const errorStr = JSON.stringify(e);
+        const errorMsg = e.message || e.toString();
+        console.log("   - MXE Part 1 error:", errorMsg);
+        if (e.logs) {
+            console.log("   - Logs:", e.logs.slice(-5));
+        }
+        if (errorStr.includes("already in use") || errorMsg.includes("already in use")) {
+            console.log("   - MXE Part 1: Account already exists.");
         }
     }
 
@@ -65,23 +72,19 @@ async function main() {
         const nodes = clusterAcc.nodes || [];
         console.log(`   - Active Nodes: ${nodes.length}`);
 
-        // Correctly Map Nodes to their Offsets
-        // InitMxePart2 expects a list of node offsets (u32) to use as recovery peers.
-        // We use all available nodes.
-        const recoveryPeers = nodes.map((node: any) => {
-            // node should be { offset: u32, ... }
-            return node.offset;
-        });
-
-        console.log(`   - Recovery Peers (Offsets):`, recoveryPeers);
-
-        // Verify count matches cluster size requirement if strict
+        // Get cluster size
         const sizeField = clusterAcc.clusterSize || clusterAcc.cluster_size || clusterAcc.size;
-        let requiredSize = 0;
-        if (sizeField && typeof sizeField.toNumber === 'function') requiredSize = sizeField.toNumber();
-        else if (sizeField) requiredSize = Number(sizeField);
+        let clusterSize = 0;
+        if (sizeField && typeof sizeField.toNumber === 'function') clusterSize = sizeField.toNumber();
+        else if (sizeField) clusterSize = Number(sizeField);
+        console.log(`   - Cluster Size: ${clusterSize}`);
 
-        console.log(`   - Cluster Required Size: ${requiredSize}`);
+        // Recovery peers: must match cluster size exactly
+        const nodeOffsets = nodes.map((node: any) => node.offset);
+        // Use exactly cluster_size recovery peers
+        const recoveryPeers = nodeOffsets.slice(0, clusterSize);
+
+        console.log(`   - Using ${recoveryPeers.length} recovery peers:`, recoveryPeers);
 
         const sig2 = await initMxePart2(
             provider,

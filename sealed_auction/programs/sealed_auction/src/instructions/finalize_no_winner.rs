@@ -20,6 +20,15 @@ pub struct FinalizeNoWinner<'info> {
     )]
     pub auction: Account<'info, Auction>,
 
+    /// The auction result from arcium_program (cross-program account verification)
+    /// Constraint: must be owned by ARCIUM_PROGRAM_ID
+    #[account(
+        seeds = [AUCTION_RESULT_SEED, auction.key().as_ref()],
+        bump = auction_result.bump,
+        seeds::program = ARCIUM_PROGRAM_ID,
+    )]
+    pub auction_result: Account<'info, AuctionResult>,
+
     #[account(
         mut,
         token::mint = auction.nft_mint,
@@ -35,10 +44,6 @@ pub struct FinalizeNoWinner<'info> {
     pub seller_nft_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
-    
-    /// CHECK: We inspect this sysvar to verify the Ed25519 signature instruction
-    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
-    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> FinalizeNoWinner<'info> {

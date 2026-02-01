@@ -1,0 +1,40 @@
+# Arcium development container with correct toolchain
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl build-essential libssl-dev pkg-config libudev-dev \
+    git ca-certificates unzip gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g yarn \
+    && rm -rf /var/lib/apt/lists/*
+
+# Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && . "$HOME/.cargo/env" \
+    && rustup default 1.89.0
+
+# Solana CLI 2.3.0 (exact version for Arcium 0.6.3)
+RUN sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.0/install)"
+
+ENV PATH="/root/.cargo/bin:/root/.local/share/solana/install/active_release/bin:${PATH}"
+
+# Anchor 0.32.1
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --force \
+    && avm install 0.32.1 \
+    && avm use 0.32.1
+
+# Arcium CLI 0.6.3
+RUN curl "https://bin.arcium.com/download/arcium_x86_64_linux_0.6.3" -o /root/.cargo/bin/arcium \
+    && chmod +x /root/.cargo/bin/arcium
+
+# Verify versions
+RUN solana --version && anchor --version && arcium --version
+
+WORKDIR /app

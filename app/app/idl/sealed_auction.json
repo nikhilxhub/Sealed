@@ -66,6 +66,59 @@
       "args": []
     },
     {
+      "name": "close_settled",
+      "docs": [
+        "Close a settled auction account to reclaim rent.",
+        "Use this to clean up old settled auctions that weren't closed properly."
+      ],
+      "discriminator": [
+        191,
+        195,
+        231,
+        168,
+        68,
+        195,
+        231,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Only the seller can close their auction"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "auction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction.nft_mint",
+                "account": "Auction"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_auction",
       "discriminator": [
         234,
@@ -143,7 +196,8 @@
       "name": "finalize_no_winner",
       "docs": [
         "Finalize auction when Arcium determines no valid winner exists",
-        "(all bids < min_price or no bids). Permissionless - anyone can crank."
+        "(all bids < min_price or no bids). Permissionless - anyone can crank.",
+        "The auction_result account must show winner = Pubkey::default() (all zeros)"
       ],
       "discriminator": [
         96,
@@ -194,6 +248,77 @@
           }
         },
         {
+          "name": "auction_result",
+          "docs": [
+            "The auction result from arcium_program (cross-program account verification)",
+            "Constraint: must be owned by ARCIUM_PROGRAM_ID"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                24,
+                149,
+                14,
+                159,
+                155,
+                138,
+                46,
+                251,
+                126,
+                217,
+                143,
+                8,
+                102,
+                170,
+                11,
+                227,
+                135,
+                163,
+                59,
+                180,
+                65,
+                50,
+                142,
+                198,
+                172,
+                153,
+                209,
+                198,
+                188,
+                220,
+                225,
+                195
+              ]
+            }
+          }
+        },
+        {
           "name": "nft_escrow_account",
           "writable": true
         },
@@ -204,22 +329,9 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
-          "name": "sysvar_instructions",
-          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "proof",
-          "type": {
-            "defined": {
-              "name": "ArciumProof"
-            }
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "lock_bid_funds",
@@ -287,6 +399,74 @@
       ]
     },
     {
+      "name": "reclaim_unsold",
+      "docs": [
+        "Reclaim NFT when auction ends with ZERO bids.",
+        "This is needed because:",
+        "- cancel_auction requires auction NOT ended",
+        "- finalize_no_winner requires AuctionResult (which requires bids to exist)",
+        "Only the seller can call this."
+      ],
+      "discriminator": [
+        132,
+        48,
+        220,
+        176,
+        66,
+        221,
+        194,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Only the seller can reclaim"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "auction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction.nft_mint",
+                "account": "Auction"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nft_escrow_account",
+          "writable": true
+        },
+        {
+          "name": "seller_nft_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "refund_loser",
       "discriminator": [
         89,
@@ -346,6 +526,11 @@
     },
     {
       "name": "settle_auction",
+      "docs": [
+        "Settle the auction using the verified result from arcium_program",
+        "The auction_result account is created by arcium_program after reveal_winner",
+        "and contains the plaintext winner/winning_amount verified by MPC"
+      ],
       "discriminator": [
         246,
         196,
@@ -371,6 +556,77 @@
         {
           "name": "auction",
           "writable": true
+        },
+        {
+          "name": "auction_result",
+          "docs": [
+            "The auction result from arcium_program (cross-program account verification)",
+            "Constraint: must be owned by ARCIUM_PROGRAM_ID"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                24,
+                149,
+                14,
+                159,
+                155,
+                138,
+                46,
+                251,
+                126,
+                217,
+                143,
+                8,
+                102,
+                170,
+                11,
+                227,
+                135,
+                163,
+                59,
+                180,
+                65,
+                50,
+                142,
+                198,
+                172,
+                153,
+                209,
+                198,
+                188,
+                220,
+                225,
+                195
+              ]
+            }
+          }
         },
         {
           "name": "winner_bid_escrow",
@@ -424,30 +680,9 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "sysvar_instructions",
-          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "winner",
-          "type": "pubkey"
-        },
-        {
-          "name": "winning_amount",
-          "type": "u64"
-        },
-        {
-          "name": "proof",
-          "type": {
-            "defined": {
-              "name": "ArciumProof"
-            }
-          }
-        }
-      ]
+      "args": []
     }
   ],
   "accounts": [
@@ -462,6 +697,19 @@
         233,
         131,
         81
+      ]
+    },
+    {
+      "name": "AuctionResult",
+      "discriminator": [
+        182,
+        105,
+        71,
+        113,
+        228,
+        147,
+        117,
+        135
       ]
     },
     {
@@ -496,77 +744,61 @@
     },
     {
       "code": 6003,
-      "name": "InvalidArciumProof",
-      "msg": "Invalid Arcium proof"
+      "name": "InvalidAuctionResult",
+      "msg": "Invalid auction result account"
     },
     {
       "code": 6004,
+      "name": "ResultNotRevealed",
+      "msg": "Auction result not revealed yet"
+    },
+    {
+      "code": 6005,
+      "name": "AuctionMismatch",
+      "msg": "Auction ID mismatch"
+    },
+    {
+      "code": 6006,
       "name": "BelowMinPrice",
       "msg": "Bid below minimum price"
     },
     {
-      "code": 6005,
+      "code": 6007,
       "name": "InsufficientEscrow",
       "msg": "Insufficient escrow"
     },
     {
-      "code": 6006,
+      "code": 6008,
       "name": "AlreadyWithdrawn",
       "msg": "Funds already withdrawn"
     },
     {
-      "code": 6007,
+      "code": 6009,
       "name": "BidsAlreadyPlaced",
       "msg": "Cannot cancel auction after bids are placed"
     },
     {
-      "code": 6008,
+      "code": 6010,
       "name": "AuctionNotSettled",
       "msg": "Auction must be settled before refunds"
     },
     {
-      "code": 6009,
+      "code": 6011,
       "name": "InvalidEndTime",
       "msg": "Auction end time must be in the future"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "InvalidMinPrice",
       "msg": "Minimum price must be greater than zero"
     },
     {
-      "code": 6011,
-      "name": "InvalidSignatureCheck",
-      "msg": "Ed25519 Signature Verification Failed"
+      "code": 6013,
+      "name": "NoValidWinner",
+      "msg": "No valid winner exists"
     }
   ],
   "types": [
-    {
-      "name": "ArciumProof",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "message_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          }
-        ]
-      }
-    },
     {
       "name": "Auction",
       "type": {
@@ -599,6 +831,60 @@
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuctionResult",
+      "docs": [
+        "AuctionResult account created by arcium_program after reveal_winner",
+        "This is a cross-program account - we read it but don't own it"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "auction_id",
+            "docs": [
+              "The auction this result belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "revealed",
+            "docs": [
+              "Whether the result has been revealed"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "winner",
+            "docs": [
+              "The winner's pubkey (plaintext)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "winning_amount",
+            "docs": [
+              "The winning bid amount in lamports (plaintext)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "revealed_at",
+            "docs": [
+              "Timestamp when revealed"
+            ],
+            "type": "i64"
           }
         ]
       }
