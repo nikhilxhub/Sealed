@@ -257,7 +257,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
 
 
 
-            await program.methods
+            const ix = await program.methods
                 .refundLoser()
                 .accountsPartial({
                     bidder: wallet.publicKey,

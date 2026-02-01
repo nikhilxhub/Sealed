@@ -100,27 +100,17 @@ Off-chain, Arcium:
 
    * highest bid ≥ minimum price
    * OR determines **no valid winner**
-4. Signs the result cryptographically
+4. Stores the result in an on-chain **AuctionResult account** (owned by Arcium program)
 
-Arcium produces either:
-
-* **Winner proof** (winner + price), or
-* **No-winner proof**
+### Important update: The "Proof"
+Arcium doesn't just produce a signature. It creates a verified **AuctionResult account** on Solana. The `sealed_auction` program reads this account and verifies that it is owned by the Arcium program PDA.
 
 ---
 
 # 🏁 Phase 5: On-Chain Finalization (Someone must call)
 
-Anyone can submit the final transaction.
-
-## Case A: There IS a winner
-
-Someone calls `settle_auction`.
-
-Anchor then:
-
 1. Verifies auction has ended
-2. Verifies Arcium’s signature
+2. Verifies the **AuctionResult account** is owned by Arcium Program
 3. Checks:
 
    * price ≥ minimum
@@ -138,12 +128,8 @@ All or nothing. No partial states.
 
 ## Case B: There is NO winner
 
-Someone calls `finalize_no_winner`.
-
-Anchor then:
-
 1. Verifies auction has ended
-2. Verifies Arcium’s “no winner” proof
+2. Verifies Arcium’s verified account showing "no winner"
 3. Transfers NFT → seller
 4. Marks auction as settled
 
@@ -185,16 +171,18 @@ Resolution must go through Arcium
 
 ---
 
-### 3️⃣ All bids below minimum price
-
 ✅ Allowed
-Arcium declares **no winner**
-NFT returns to seller
+Arcium declares **no winner** (in the AuctionResult account)
+NFT returns to seller via `finalize_no_winner`
 Bidders refund themselves
 
 ---
 
-### 4️⃣ Only one bidder
+### 4️⃣ Auction ends with ZERO bids
+
+✅ Allowed
+Seller calls `reclaim_unsold`
+NFT returns to seller immediately (no Arcium step needed for 0 bids)
 
 ✅ Allowed
 Sealed-bid auctions still work

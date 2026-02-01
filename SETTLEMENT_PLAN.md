@@ -1,4 +1,4 @@
-# Settlement Flow Implementation Plan
+# Settlement Flow Implementation Plan (IMPLEMENTED)
 
 ## Current Gap
 
