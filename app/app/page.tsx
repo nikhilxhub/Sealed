@@ -20,7 +20,7 @@ export default function Home() {
           Bid with absolute authority.
         </p>
 
-        <div className="pt-8 opacity-0 animate-fade-in-delayed delay-300 flex flex-col sm:flex-row gap-6 items-center">
+        <div className="pt-8 opacity-0 animate-fade-in-delayed delay-300 flex flex-col sm:flex-row gap-6 items-start sm:items-center">
           <Button variant="link" asChild className="text-lg pl-0">
             <Link href="/explore">Explore Open Markets &rarr;</Link>
           </Button>
