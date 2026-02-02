@@ -24,7 +24,7 @@ export default function Home() {
           <Button variant="link" asChild className="text-lg pl-0">
             <Link href="/explore">Explore Open Markets &rarr;</Link>
           </Button>
-          <Button variant="link" asChild className="text-lg text-[#888888] hover:text-white transition-colors">
+          <Button variant="link" asChild className="text-lg text-[#888888] hover:text-white transition-colors pl-0">
             <Link href="/create">Create Auction</Link>
           </Button>
         </div>
