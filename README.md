@@ -2,6 +2,14 @@
 
 A privacy-preserving sealed-bid auction protocol on Solana, leveraging **Arcium** for confidential computing. This protocol ensures that bid amounts remain secret until the auction concludes, preventing front-running and bid sniping.
 
+> [!IMPORTANT]
+> ### ⚠️ Note for Hackathon Judges
+> **Settlement : MPC computation is slow on devnet.**
+> Devnet can be slow - please wait 1-2 minutes and try again.
+>
+> 1. Wait 2-3 minutes total from your first "Settle" click.
+> 2. Then try clicking **"Settle Auction"** again.
+
 ## 1. Protocol Lifecycle
 
 The protocol operates in three distinct phases:
@@ -65,3 +73,8 @@ Allows reclaiming rent from old settled auction accounts.
 ## 3. Technology Stack
 - **Solana (Anchor)**: Consensus and settlement layer.
 - **Arcium**: Confidential computing layer for encrypted bid processing.
+
+---
+
+## 🚀 What's Next?
+Check out our [Future Roadmap](FUTURE_PLANS.md) to see how we are evolving Sealed into a privacy-first liquidity layer for digital assets.

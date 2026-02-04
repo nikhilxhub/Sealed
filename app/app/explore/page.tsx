@@ -11,6 +11,7 @@ import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useLoading } from "@/components/providers/LoadingProvider";
 
 // Data Model
 interface AuctionItem {
@@ -36,6 +37,8 @@ export default function ExplorePage() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [priceFilter, setPriceFilter] = useState("all");
     const [timeFilter, setTimeFilter] = useState("all");
+    const { setIsLoading } = useLoading();
+    const [clickingId, setClickingId] = useState<string | null>(null);
 
     // Fetch Data
     useEffect(() => {
@@ -179,7 +182,7 @@ export default function ExplorePage() {
 
                     <Link href="/create" className="font-sans text-base font-medium text-white hover:text-white/80 transition-colors mb-2 pr-1">
                         create auction  &rarr;
-                        
+
                     </Link>
                 </div>
 
@@ -295,6 +298,10 @@ export default function ExplorePage() {
                                 <Link
                                     key={auction.id}
                                     href={`/auctions/${auction.id}`}
+                                    onClick={() => {
+                                        setClickingId(auction.id);
+                                        setIsLoading(true);
+                                    }}
                                     className="group grid grid-cols-12 gap-4 px-4 py-8 border-b border-[#24262D] items-center transition-all duration-300 hover:bg-[#1A1C22]"
                                     style={{ animationDelay: `${i * 50}ms` }}
                                 >
@@ -318,8 +325,12 @@ export default function ExplorePage() {
                                             <span className="text-[#666]">{auction.endsIn}</span>
                                         )}
                                     </div>
-                                    <div className="col-span-0 md:col-span-2 hidden md:flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <span className="text-xs uppercase tracking-widest border-b border-white text-white">View</span>
+                                    <div className="col-span-0 md:col-span-2 hidden md:flex justify-end pr-2">
+                                        {clickingId === auction.id ? (
+                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <span className="text-xs uppercase tracking-widest border-b border-white text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">View</span>
+                                        )}
                                     </div>
                                 </Link>
                             ))

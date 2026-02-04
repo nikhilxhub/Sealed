@@ -1,7 +1,3 @@
-Absolutely.
-Let’s reset and explain the **entire protocol in simple, human words**, then walk through the **end-to-end workflow** and **all edge cases**.
-
-No code. No jargon unless needed. This is the explanation you could give to **judges, teammates, or yourself at 2 AM**.
 
 ---
 

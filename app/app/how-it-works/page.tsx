@@ -5,8 +5,8 @@ import React, { useEffect, useRef, useState } from "react";
 const STEPS = [
     {
         id: 1,
-        title: "Lock NFT",
-        description: "The seller defines auction parameters and locks the NFT into escrow. The asset is cryptographically secured before bidding begins.",
+        title: "Auction Creation",
+        description: "The seller defines auction parameters (min price, duration) and locks the NFT into a secure Solana Escrow PDA. The asset is held trustlessly until settlement.",
         diagram: (
             <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
                 <rect x="50" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -17,8 +17,8 @@ const STEPS = [
     },
     {
         id: 2,
-        title: "Submit Encrypted Bids",
-        description: "Bidders place encrypted bids into the contract. The bid amount is hidden using a commit-reveal scheme. No information is leaked during the bidding period.",
+        title: "Bid & Lock Collateral",
+        description: "Bidders submit encrypted bid values directly to the Arcium MPC network while simultaneously locking their maximum collateral in a Solana PDA. Bid amounts remain private even from the blockchain.",
         diagram: (
             <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
                 <circle cx="50" cy="30" r="4" fill="currentColor" />
@@ -31,8 +31,8 @@ const STEPS = [
     },
     {
         id: 3,
-        title: "Reveal Winner",
-        description: "Once the auction expires, all bids are revealed. The contract identifies the highest bidder and prepares for settlement.",
+        title: "MPC Winner Reveal",
+        description: "After the auction ends, Arcium nodes compute the winner privately. A verified 'AuctionResult' is published on-chain, proving the winner and price without exposing other bids.",
         diagram: (
             <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
                 <rect x="160" y="20" width="60" height="80" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -43,8 +43,8 @@ const STEPS = [
     },
     {
         id: 4,
-        title: "Automatic Settlement",
-        description: "Funds are transferred to the seller, the NFT is released to the winner, and losing bids are automatically refunded. The process is trustless and irreversible.",
+        title: "Trustless Settlement",
+        description: "Anyone can 'crank' the settlement. The program atomically transfers the NFT to the winner, sends the winning bid to the seller, and refunds excess collateral back to the winner.",
         diagram: (
             <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
                 <rect x="50" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -52,6 +52,17 @@ const STEPS = [
                 <rect x="180" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M240 60 L290 60" stroke="currentColor" strokeWidth="1.5" />
                 <rect x="290" y="40" width="60" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+        )
+    },
+    {
+        id: 5,
+        title: "Refunds & Reclaims",
+        description: "Losing bidders reclaim their 100% collateral. If zero bids were placed, the seller can reclaim their unsold NFT from the escrow account.",
+        diagram: (
+            <svg width="100%" height="120" viewBox="0 0 400 120" className="opacity-50">
+                <circle cx="200" cy="60" r="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4" />
+                <path d="M200 30 L200 90 M170 60 L230 60" stroke="currentColor" strokeWidth="1" opacity="0.5" />
             </svg>
         )
     },
