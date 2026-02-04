@@ -17,17 +17,25 @@ export const useLoading = () => useContext(LoadingContext);
 
 export const LoadingProvider = ({ children }: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(false);
+
+    return (
+        <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
+            <React.Suspense fallback={null}>
+                <LoadingHandler setIsLoading={setIsLoading} />
+            </React.Suspense>
+            {children}
+        </LoadingContext.Provider>
+    );
+};
+
+const LoadingHandler = ({ setIsLoading }: { setIsLoading: (loading: boolean) => void }) => {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
     // Reset loading state on route change
     useEffect(() => {
         setIsLoading(false);
-    }, [pathname, searchParams]);
+    }, [pathname, searchParams, setIsLoading]);
 
-    return (
-        <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
-            {children}
-        </LoadingContext.Provider>
-    );
+    return null;
 };
